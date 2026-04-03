@@ -11,13 +11,13 @@ def register_subreddit_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_subreddit_info(
+    async def reddit_get_subreddit_info(
         subreddit: Annotated[str, "Subreddit name without r/ prefix"],
     ) -> dict:
         """
-        Get metadata about a subreddit: subscriber count, description, active users.
+        Get metadata about a Reddit subreddit: subscriber count, description, active users.
 
-        Use this for context before searching or browsing a subreddit.
+        Use this for context before searching or browsing a specific subreddit.
         """
         subreddit = validate_subreddit_name(subreddit)
 
@@ -26,12 +26,12 @@ def register_subreddit_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_subreddit_wiki(
+    async def reddit_get_subreddit_wiki(
         subreddit: Annotated[str, "Subreddit name without r/ prefix"],
         page: Annotated[str, "Wiki page name (default: 'index')"] = "index",
     ) -> dict:
         """
-        Read curated community knowledge from subreddit wikis.
+        Read a wiki page from a Reddit subreddit.
 
         Many subreddits maintain FAQs, tool lists, and guides in their wikis.
         """
@@ -43,13 +43,13 @@ def register_subreddit_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def list_subreddit_wiki_pages(
+    async def reddit_list_subreddit_wiki_pages(
         subreddit: Annotated[str, "Subreddit name without r/ prefix"],
     ) -> list[str] | dict:
         """
-        List available wiki pages in a subreddit.
+        List available wiki pages in a Reddit subreddit.
 
-        Use this to discover what wiki content a subreddit has before fetching specific pages.
+        Use this to discover what wiki content a subreddit offers before fetching specific pages.
         """
         subreddit = validate_subreddit_name(subreddit)
 

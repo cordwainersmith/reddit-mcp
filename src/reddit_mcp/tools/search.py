@@ -17,7 +17,7 @@ def register_search_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def search_reddit(
+    async def reddit_search_posts(
         query: Annotated[str, "Search query string (keywords)"],
         subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'. Use 'all' for site-wide."] = "all",
         sort: Annotated[str, "Sort order: relevance, hot, top, new, comments"] = "relevance",
@@ -27,7 +27,7 @@ def register_search_tools(mcp, get_client):
         """
         Search Reddit posts by keywords across one or more subreddits.
 
-        Use this to find discussions about specific topics, products, or technologies.
+        Use this to find Reddit discussions about specific topics, products, or technologies.
         """
         sort = validate_sort(sort, SEARCH_SORT_OPTIONS, "search sort")
         time_filter = validate_time_filter(time_filter)
@@ -43,14 +43,14 @@ def register_search_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def search_subreddits(
+    async def reddit_find_subreddits(
         query: Annotated[str, "Search terms to find subreddits"],
         limit: Annotated[int, "Max results (1-50)"] = 10,
     ) -> list[dict] | dict:
         """
-        Find subreddits by topic.
+        Find Reddit subreddits by topic or keyword.
 
-        Use this when you need to discover which communities discuss a subject.
+        Use this to discover which Reddit communities discuss a given subject.
         """
         limit = validate_limit(limit, max_val=50)
 

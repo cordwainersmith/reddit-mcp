@@ -17,13 +17,13 @@ def register_user_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_user_info(
+    async def reddit_get_user_info(
         username: Annotated[str, "Reddit username (without u/ prefix)"],
     ) -> dict:
         """
         Get metadata about a Reddit user: karma, account age, verified status.
 
-        Use this to understand a user's profile before looking at their posts or comments.
+        Use this to understand a Reddit user's profile before looking at their posts or comments.
         """
         username = validate_username(username)
 
@@ -32,7 +32,7 @@ def register_user_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_user_posts(
+    async def reddit_get_user_posts(
         username: Annotated[str, "Reddit username (without u/ prefix)"],
         sort: Annotated[str, "Sort: new, hot, top, controversial"] = "new",
         time_filter: Annotated[str, "Time filter for top/controversial: hour, day, week, month, year, all"] = "all",
@@ -41,7 +41,7 @@ def register_user_tools(mcp, get_client):
         """
         Get posts submitted by a specific Reddit user.
 
-        Use this to see a user's submission history.
+        Use this to see a Reddit user's submission history.
         """
         username = validate_username(username)
         sort = validate_sort(sort, USER_SORT_OPTIONS, "user sort")
@@ -55,7 +55,7 @@ def register_user_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_user_comments(
+    async def reddit_get_user_comments(
         username: Annotated[str, "Reddit username (without u/ prefix)"],
         sort: Annotated[str, "Sort: new, hot, top, controversial"] = "new",
         time_filter: Annotated[str, "Time filter for top/controversial: hour, day, week, month, year, all"] = "all",
@@ -64,7 +64,7 @@ def register_user_tools(mcp, get_client):
         """
         Get comments made by a specific Reddit user.
 
-        Use this to see a user's comment history.
+        Use this to see a Reddit user's comment history.
         """
         username = validate_username(username)
         sort = validate_sort(sort, USER_SORT_OPTIONS, "user sort")

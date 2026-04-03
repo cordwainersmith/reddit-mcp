@@ -45,16 +45,16 @@ uv run pytest tests/ -v
 
 | Tool | Description |
 |---|---|
-| `search_reddit` | Search posts by keywords across subreddits |
-| `search_subreddits` | Find subreddits by topic |
-| `get_subreddit_posts` | Browse posts by sort order |
-| `get_post_details` | Fetch a post with comments |
-| `get_posts_batch` | Fetch multiple posts at once (max 10) |
-| `get_trending` | Popular posts site-wide |
-| `get_comment_thread` | Follow a conversation thread with parent/reply context |
-| `get_user_info` | User profile metadata |
-| `get_user_posts` | User's submission history |
-| `get_user_comments` | User's comment history |
-| `get_subreddit_info` | Subreddit metadata |
-| `get_subreddit_wiki` | Read a subreddit wiki page |
-| `list_subreddit_wiki_pages` | List available wiki pages |
+| `reddit_search_posts` | Search posts by keywords across subreddits |
+| `reddit_find_subreddits` | Find subreddits by topic or keyword |
+| `reddit_get_subreddit_posts` | Browse posts from subreddits by sort order |
+| `reddit_get_post_details` | Fetch a post with its comments |
+| `reddit_get_posts_by_ids` | Fetch multiple posts by ID in one call (max 10) |
+| `reddit_get_trending_posts` | Popular posts site-wide |
+| `reddit_get_comment_with_replies` | Get a comment with parent chain and nested replies |
+| `reddit_get_user_info` | User profile metadata |
+| `reddit_get_user_posts` | User's submission history |
+| `reddit_get_user_comments` | User's comment history |
+| `reddit_get_subreddit_info` | Subreddit metadata |
+| `reddit_get_subreddit_wiki` | Read a subreddit wiki page |
+| `reddit_list_subreddit_wiki_pages` | List available wiki pages |

@@ -78,9 +78,9 @@ register_all_tools(mcp, get_client)
 
 
 @mcp.tool()
-async def get_server_status() -> dict:
+async def reddit_get_server_status() -> dict:
     """
-    Get server health and diagnostics.
+    Get Reddit MCP server health and diagnostics.
 
     Returns credential count, cache hit/miss stats, and configuration info.
     """

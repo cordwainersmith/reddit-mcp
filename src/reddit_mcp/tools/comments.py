@@ -11,17 +11,17 @@ def register_comment_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_comment_thread(
+    async def reddit_get_comment_with_replies(
         comment_id: Annotated[str, "The comment ID to focus on"],
         context: Annotated[int, "How many parent comments to include (1-10)"] = 5,
         reply_depth: Annotated[int, "How many levels of replies to include (1-5)"] = 2,
         reply_limit: Annotated[int, "Max replies per level (1-25)"] = 10,
     ) -> dict:
         """
-        Follow a specific conversation thread.
+        Get a Reddit comment with its parent chain and nested replies.
 
-        Use this to read the full context of an interesting comment, including
-        its parent chain and nested replies.
+        Use this to read the full context of a Reddit comment thread, including
+        ancestor comments and reply trees.
         """
         context = validate_limit(context, min_val=1, max_val=10)
         reply_depth = validate_limit(reply_depth, min_val=1, max_val=5)

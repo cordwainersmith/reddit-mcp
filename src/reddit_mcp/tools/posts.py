@@ -18,16 +18,16 @@ def register_post_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_subreddit_posts(
+    async def reddit_get_subreddit_posts(
         subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'"],
         sort: Annotated[str, "Sort: hot, new, top, rising"] = "hot",
         time_filter: Annotated[str, "Time filter for 'top' sort: hour, day, week, month, year, all"] = "week",
         limit: Annotated[int, "Max posts (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
-        Browse posts from one or more subreddits by sort order.
+        Browse Reddit posts from one or more subreddits by sort order.
 
-        Use this to see what's currently active or trending in specific communities.
+        Use this to see what's currently active or popular in specific Reddit communities.
         """
         sort = validate_sort(sort, POST_SORT_OPTIONS, "post sort")
         time_filter = validate_time_filter(time_filter)
@@ -42,7 +42,7 @@ def register_post_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_post_details(
+    async def reddit_get_post_details(
         post_id: Annotated[str, "Reddit post ID (e.g. 'abc123', without 't3_' prefix)"],
         include_comments: Annotated[bool, "Whether to include top comments"] = True,
         comment_limit: Annotated[int, "Max comments to include (1-200)"] = 20,
@@ -51,7 +51,7 @@ def register_post_tools(mcp, get_client):
         """
         Fetch a specific Reddit post by ID, optionally with its top comments.
 
-        Use this to deep-dive into a discussion found via search or browsing.
+        Use this to deep-dive into a Reddit discussion found via search or browsing.
         """
         comment_sort = validate_sort(comment_sort, COMMENT_SORT_OPTIONS, "comment sort")
         comment_limit = validate_limit(comment_limit, max_val=200)
@@ -68,15 +68,15 @@ def register_post_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_posts_batch(
+    async def reddit_get_posts_by_ids(
         post_ids: Annotated[str, "Comma-separated post IDs (max 10), e.g. 'abc123,def456'"],
         include_comments: Annotated[bool, "Whether to include top comments for each post"] = False,
         comment_limit: Annotated[int, "Max comments per post (1-50)"] = 5,
     ) -> list[dict] | dict:
         """
-        Fetch multiple posts at once. More efficient than calling get_post_details repeatedly.
+        Fetch multiple Reddit posts by their IDs in a single call.
 
-        Use this when you have several post IDs and want to retrieve them in one call.
+        More efficient than calling reddit_get_post_details repeatedly when you have several post IDs.
         """
         comment_limit = validate_limit(comment_limit, max_val=50)
 
@@ -95,13 +95,13 @@ def register_post_tools(mcp, get_client):
 
     @mcp.tool()
     @handle_tool_errors
-    async def get_trending(
+    async def reddit_get_trending_posts(
         limit: Annotated[int, "Max posts (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
-        Get popular/trending posts across all of Reddit.
+        Get popular and trending posts across all of Reddit right now.
 
-        Use this to see what's currently popular site-wide.
+        Use this to see what's currently hot site-wide on Reddit.
         """
         limit = validate_limit(limit)
 
