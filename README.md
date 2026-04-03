@@ -28,6 +28,13 @@ Optionally set a custom user agent:
 export REDDIT_USER_AGENT="my-app/1.0"
 ```
 
+For write operations (vote, reply, post, save, delete, edit), also set:
+
+```bash
+export REDDIT_USERNAME="your_reddit_username"
+export REDDIT_PASSWORD="your_reddit_password"
+```
+
 ## Run
 
 ```bash
@@ -58,3 +65,11 @@ uv run pytest tests/ -v
 | `reddit_get_subreddit_info` | Subreddit metadata |
 | `reddit_get_subreddit_wiki` | Read a subreddit wiki page |
 | `reddit_list_subreddit_wiki_pages` | List available wiki pages |
+| `reddit_vote` | Upvote, downvote, or clear vote on a post or comment |
+| `reddit_reply_to_post` | Reply to a post with a top-level comment |
+| `reddit_reply_to_comment` | Reply to a comment with a nested reply |
+| `reddit_create_post` | Create a new self-post or link post in a subreddit |
+| `reddit_save` | Save a post or comment for later |
+| `reddit_unsave` | Unsave a previously saved post or comment |
+| `reddit_delete` | Delete a post or comment you authored |
+| `reddit_edit` | Edit a post or comment you authored |
