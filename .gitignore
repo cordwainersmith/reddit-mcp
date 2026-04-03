@@ -23,5 +23,8 @@ CLAUDE.md
 # Test artifacts
 .coverage
 
+# SSL cert bundles
+*.pem
+
 # Local plans
 plans/

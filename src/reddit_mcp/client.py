@@ -149,11 +149,16 @@ class RedditClient:
         """Get an AsyncPRAW client from the next available credential."""
         cred = await self._get_credential()
         if cred.reddit is None:
-            cred.reddit = asyncpraw.Reddit(
-                client_id=cred.client_id,
-                client_secret=cred.client_secret,
-                user_agent=self._user_agent,
-            )
+            kwargs: dict[str, Any] = {
+                "client_id": cred.client_id,
+                "client_secret": cred.client_secret,
+                "user_agent": self._user_agent,
+            }
+            if os.environ.get("REDDIT_MCP_IGNORE_SSL", "").lower() in ("1", "true", "yes"):
+                import aiohttp
+                connector = aiohttp.TCPConnector(ssl=False)
+                kwargs["requestor_kwargs"] = {"session": aiohttp.ClientSession(connector=connector)}
+            cred.reddit = asyncpraw.Reddit(**kwargs)
         return cred.reddit
 
     async def close(self) -> None:
