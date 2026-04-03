@@ -8,3 +8,20 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# AI assistant config
+CLAUDE.md
+
+# Editor config
+.cursor/
+
+# Test artifacts
+.coverage
+
+# Local plans
+plans/
