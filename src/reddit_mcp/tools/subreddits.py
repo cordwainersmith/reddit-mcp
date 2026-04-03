@@ -1,12 +1,16 @@
 """Subreddit-related tools for Reddit MCP server."""
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
+from mcp.server.fastmcp import FastMCP
+
+from reddit_mcp.client import RedditClient
 from reddit_mcp.errors import handle_tool_errors
 from reddit_mcp.validators import validate_subreddit_name, validate_wiki_page_name
 
 
-def register_subreddit_tools(mcp, get_client):
+def register_subreddit_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditClient]]) -> None:
     """Register subreddit-related MCP tools."""
 
     @mcp.tool()

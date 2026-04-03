@@ -2,8 +2,9 @@
 
 import functools
 import hashlib
+import inspect
 import logging
-from typing import Any, Callable
+from typing import Callable
 
 from cachetools import TTLCache
 
@@ -24,6 +25,15 @@ def _make_key(func_name: str, args: tuple, kwargs: dict) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def _has_self_param(func: Callable) -> bool:
+    """Check whether the function's first parameter is named 'self'."""
+    try:
+        params = list(inspect.signature(func).parameters)
+        return bool(params) and params[0] == "self"
+    except (ValueError, TypeError):
+        return False
+
+
 def cached(ttl: int = 300, maxsize: int = 128) -> Callable:
     """Decorator that adds TTL caching to async functions.
 
@@ -35,6 +45,7 @@ def cached(ttl: int = 300, maxsize: int = 128) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         func_name = func.__qualname__
+        ignore_first = _has_self_param(func)
 
         # Initialize stats for this function
         _stats[func_name] = {"hits": 0, "misses": 0}
@@ -42,7 +53,7 @@ def cached(ttl: int = 300, maxsize: int = 128) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             # Skip 'self' from cache key for methods
-            cache_args = args[1:] if args and hasattr(args[0], func.__name__) else args
+            cache_args = args[1:] if ignore_first else args
             key = _make_key(func_name, cache_args, kwargs)
 
             if key in cache:

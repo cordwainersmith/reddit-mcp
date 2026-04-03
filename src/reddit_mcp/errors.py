@@ -1,7 +1,10 @@
 """Custom exception hierarchy and error-handling utilities for the Reddit MCP server."""
 
 import functools
+import logging
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 
 class RedditMCPError(Exception):
@@ -44,10 +47,19 @@ class RedditAPIError(RedditMCPError):
     """Raised when the Reddit API returns a server error or is unreachable."""
 
 
+class AuthenticationRequiredError(RedditMCPError):
+    """Raised when a write tool is called but no user credentials are configured."""
+
+
+class SubmissionError(RedditMCPError):
+    """Raised when post creation or submission fails."""
+
+
 def handle_tool_errors(func: Callable) -> Callable:
     """Decorator that catches RedditMCPError and returns an error dict.
 
-    Eliminates the need for repetitive try/except blocks in each tool function.
+    Also catches unexpected exceptions with a generic fallback so that
+    MCP tools never crash silently.
     """
 
     @functools.wraps(func)
@@ -56,5 +68,8 @@ def handle_tool_errors(func: Callable) -> Callable:
             return await func(*args, **kwargs)
         except RedditMCPError as e:
             return {"error": str(e), "error_type": type(e).__name__}
+        except Exception as e:
+            logger.exception("Unexpected error in tool %s", func.__name__)
+            return {"error": f"Internal error: {e}", "error_type": type(e).__name__}
 
     return wrapper

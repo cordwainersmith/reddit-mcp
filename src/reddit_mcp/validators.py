@@ -81,3 +81,65 @@ def validate_wiki_page_name(value: str) -> str:
             "Must be 1-128 characters, alphanumeric, underscores, slashes, dots, and hyphens only."
         )
     return value
+
+
+VOTE_DIRECTION_OPTIONS = ("up", "down", "clear")
+THING_TYPE_OPTIONS = ("post", "comment")
+
+_URL_RE = re.compile(r"^https?://\S+$")
+
+
+def validate_vote_direction(value: str) -> str:
+    """Validate vote direction is one of 'up', 'down', 'clear'."""
+    value = value.strip().lower()
+    if value not in VOTE_DIRECTION_OPTIONS:
+        raise ValidationError(
+            f"Invalid vote direction '{value}'. "
+            f"Valid options: {', '.join(VOTE_DIRECTION_OPTIONS)}"
+        )
+    return value
+
+
+def validate_thing_type(value: str) -> str:
+    """Validate thing type is one of 'post', 'comment'."""
+    value = value.strip().lower()
+    if value not in THING_TYPE_OPTIONS:
+        raise ValidationError(
+            f"Invalid thing type '{value}'. "
+            f"Valid options: {', '.join(THING_TYPE_OPTIONS)}"
+        )
+    return value
+
+
+def validate_post_title(value: str) -> str:
+    """Validate post title is non-empty and max 300 characters."""
+    value = value.strip()
+    if not value:
+        raise ValidationError("Post title cannot be empty")
+    if len(value) > 300:
+        raise ValidationError(
+            f"Post title too long ({len(value)} chars). Maximum is 300 characters."
+        )
+    return value
+
+
+def validate_body_text(value: str) -> str:
+    """Validate body text is non-empty and max 40,000 characters."""
+    value = value.strip()
+    if not value:
+        raise ValidationError("Body text cannot be empty")
+    if len(value) > 40_000:
+        raise ValidationError(
+            f"Body text too long ({len(value)} chars). Maximum is 40,000 characters."
+        )
+    return value
+
+
+def validate_url(value: str) -> str:
+    """Validate URL for link posts (must start with http:// or https://)."""
+    value = value.strip()
+    if not _URL_RE.match(value):
+        raise ValidationError(
+            f"Invalid URL '{value}'. Must start with http:// or https://."
+        )
+    return value

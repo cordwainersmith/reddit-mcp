@@ -60,7 +60,14 @@ async def get_client() -> RedditClient:
             )
 
         user_agent = os.environ.get("REDDIT_USER_AGENT", "reddit-mcp/1.0")
-        _client = RedditClient(credentials=credentials, user_agent=user_agent)
+        username = os.environ.get("REDDIT_USERNAME") or None
+        password = os.environ.get("REDDIT_PASSWORD") or None
+        _client = RedditClient(
+            credentials=credentials,
+            user_agent=user_agent,
+            username=username,
+            password=password,
+        )
     return _client
 
 
@@ -98,13 +105,11 @@ def main():
         # Ensure client is closed on shutdown
         if _client is not None:
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(shutdown_client())
-                else:
-                    loop.run_until_complete(shutdown_client())
+                loop = asyncio.get_running_loop()
+                loop.create_task(shutdown_client())
             except RuntimeError:
-                pass
+                # No running loop -- run synchronously
+                asyncio.run(shutdown_client())
 
 
 if __name__ == "__main__":

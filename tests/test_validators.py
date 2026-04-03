@@ -8,11 +8,16 @@ from reddit_mcp.validators import (
     POST_SORT_OPTIONS,
     SEARCH_SORT_OPTIONS,
     USER_SORT_OPTIONS,
+    validate_body_text,
     validate_limit,
+    validate_post_title,
     validate_sort,
     validate_subreddit_name,
+    validate_thing_type,
     validate_time_filter,
+    validate_url,
     validate_username,
+    validate_vote_direction,
 )
 
 
@@ -150,3 +155,117 @@ class TestValidateUsername:
             validate_username("user@name")
         with pytest.raises(ValidationError):
             validate_username("user name")
+
+
+class TestValidateVoteDirection:
+    def test_valid_directions(self):
+        assert validate_vote_direction("up") == "up"
+        assert validate_vote_direction("down") == "down"
+        assert validate_vote_direction("clear") == "clear"
+
+    def test_case_insensitive(self):
+        assert validate_vote_direction("UP") == "up"
+        assert validate_vote_direction("Down") == "down"
+
+    def test_strips_whitespace(self):
+        assert validate_vote_direction("  up  ") == "up"
+
+    def test_invalid_raises(self):
+        with pytest.raises(ValidationError, match="Invalid vote direction"):
+            validate_vote_direction("sideways")
+
+    def test_empty_raises(self):
+        with pytest.raises(ValidationError):
+            validate_vote_direction("")
+
+
+class TestValidateThingType:
+    def test_valid_types(self):
+        assert validate_thing_type("post") == "post"
+        assert validate_thing_type("comment") == "comment"
+
+    def test_case_insensitive(self):
+        assert validate_thing_type("POST") == "post"
+        assert validate_thing_type("Comment") == "comment"
+
+    def test_strips_whitespace(self):
+        assert validate_thing_type("  post  ") == "post"
+
+    def test_invalid_raises(self):
+        with pytest.raises(ValidationError, match="Invalid thing type"):
+            validate_thing_type("subreddit")
+
+    def test_empty_raises(self):
+        with pytest.raises(ValidationError):
+            validate_thing_type("")
+
+
+class TestValidatePostTitle:
+    def test_valid_title(self):
+        assert validate_post_title("Hello World") == "Hello World"
+
+    def test_strips_whitespace(self):
+        assert validate_post_title("  Hello  ") == "Hello"
+
+    def test_max_length(self):
+        title = "A" * 300
+        assert validate_post_title(title) == title
+
+    def test_too_long(self):
+        with pytest.raises(ValidationError, match="300"):
+            validate_post_title("A" * 301)
+
+    def test_empty_raises(self):
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            validate_post_title("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            validate_post_title("   ")
+
+
+class TestValidateBodyText:
+    def test_valid_body(self):
+        assert validate_body_text("Hello World") == "Hello World"
+
+    def test_strips_whitespace(self):
+        assert validate_body_text("  Hello  ") == "Hello"
+
+    def test_max_length(self):
+        body = "A" * 40_000
+        assert validate_body_text(body) == body
+
+    def test_too_long(self):
+        with pytest.raises(ValidationError, match="40,000"):
+            validate_body_text("A" * 40_001)
+
+    def test_empty_raises(self):
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            validate_body_text("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            validate_body_text("   ")
+
+
+class TestValidateUrl:
+    def test_valid_http(self):
+        assert validate_url("http://example.com") == "http://example.com"
+
+    def test_valid_https(self):
+        assert validate_url("https://example.com/path?q=1") == "https://example.com/path?q=1"
+
+    def test_strips_whitespace(self):
+        assert validate_url("  https://example.com  ") == "https://example.com"
+
+    def test_invalid_no_scheme(self):
+        with pytest.raises(ValidationError, match="Must start with"):
+            validate_url("example.com")
+
+    def test_invalid_ftp(self):
+        with pytest.raises(ValidationError, match="Must start with"):
+            validate_url("ftp://example.com")
+
+    def test_empty_raises(self):
+        with pytest.raises(ValidationError):
+            validate_url("")

@@ -95,3 +95,12 @@ class WikiPageDict(TypedDict, total=False):
     content_md: str
     revision_date: str | None
     revision_by: str | None
+
+
+class ActionResultDict(TypedDict, total=False):
+    """Shape of a write action response returned by the client."""
+
+    success: bool
+    id: str
+    permalink: str
+    message: str

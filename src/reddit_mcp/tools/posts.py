@@ -1,7 +1,11 @@
 """Post-related tools for Reddit MCP server."""
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
+from mcp.server.fastmcp import FastMCP
+
+from reddit_mcp.client import RedditClient
 from reddit_mcp.errors import ValidationError, handle_tool_errors
 from reddit_mcp.validators import (
     COMMENT_SORT_OPTIONS,
@@ -13,7 +17,7 @@ from reddit_mcp.validators import (
 )
 
 
-def register_post_tools(mcp, get_client):
+def register_post_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditClient]]) -> None:
     """Register post-related MCP tools."""
 
     @mcp.tool()
