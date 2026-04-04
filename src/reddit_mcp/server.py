@@ -107,10 +107,10 @@ register_all_tools(mcp, get_client)
 @handle_tool_errors
 async def reddit_get_server_status() -> dict:
     """
-    Get Reddit MCP server health, diagnostics, and available usernames for write operations.
+    Get Reddit MCP server health and diagnostics: credential rate-limit status and cache stats.
 
-    Use this to check server health and discover which usernames can be passed to write tools
-    (reddit_vote, reddit_reply, reddit_create_post, reddit_save, reddit_delete, reddit_edit).
+    Use this for operational health checks and debugging. For a quick list of usernames
+    available for write tools, use reddit_get_configured_users instead.
 
     Returns: {
         "credentials": [{index, request_count, seconds_until_reset, is_available}],
@@ -125,6 +125,25 @@ async def reddit_get_server_status() -> dict:
         **status,
         "cache_stats": cache_stats(),
     }
+
+
+@mcp.tool()
+@handle_tool_errors
+async def reddit_get_configured_users() -> dict:
+    """
+    Return the list of usernames configured for write operations
+    (reddit_vote, reddit_reply, reddit_create_post, reddit_save, reddit_delete, reddit_edit).
+
+    Use when: you need to pick a valid username before calling any write tool.
+    For full server diagnostics, use reddit_get_server_status instead.
+
+    Returns: {"usernames": ["user1", "user2"], "count": 2}
+    If no users are configured, returns {"usernames": [], "count": 0}.
+    On error: {"error": "...", "error_type": "CREDENTIAL_ERROR|INTERNAL_ERROR"}
+    """
+    client = await get_client()
+    usernames = client.available_usernames
+    return {"usernames": usernames, "count": len(usernames)}
 
 
 def main():

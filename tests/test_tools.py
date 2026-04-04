@@ -490,3 +490,37 @@ class TestSubredditTools:
         funcs = register_and_capture(register_subreddit_tools, async_get_client)
         result = await funcs["reddit_list_subreddit_wiki_pages"](subreddit="python")
         assert result["error_type"] == "NOT_FOUND"
+
+
+class TestGetConfiguredUsers:
+    @pytest.mark.asyncio
+    async def test_returns_configured_usernames(self):
+        from reddit_mcp.server import reddit_get_configured_users
+
+        mock_client = MagicMock()
+        mock_client.available_usernames = ["alpha", "beta", "zeta"]
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "reddit_mcp.server.get_client",
+                AsyncMock(return_value=mock_client),
+            )
+            result = await reddit_get_configured_users()
+
+        assert result == {"usernames": ["alpha", "beta", "zeta"], "count": 3}
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_users(self):
+        from reddit_mcp.server import reddit_get_configured_users
+
+        mock_client = MagicMock()
+        mock_client.available_usernames = []
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "reddit_mcp.server.get_client",
+                AsyncMock(return_value=mock_client),
+            )
+            result = await reddit_get_configured_users()
+
+        assert result == {"usernames": [], "count": 0}
