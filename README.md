@@ -30,8 +30,12 @@ REDDIT_CREDENTIALS=client_id1:secret1,client_id2:secret2,client_id3:secret3
 REDDIT_USER_AGENT=reddit-mcp/1.0 (by /u/your_username)
 
 # For write operations (vote, reply, post, save, delete, edit)
-REDDIT_USERNAME=your_reddit_username
-REDDIT_PASSWORD=your_reddit_password
+# Multiple users supported - agents specify which username to act as
+REDDIT_USERS=reddit_username1:password1,reddit_username2:password2
+
+# Or single-user fallback (used if REDDIT_USERS is not set)
+# REDDIT_USERNAME=your_reddit_username
+# REDDIT_PASSWORD=your_reddit_password
 ```
 
 ## Run
@@ -67,7 +71,9 @@ uv run pytest tests/ -v
 | `reddit_list_subreddit_wiki_pages` | List available wiki pages |
 | `reddit_get_server_status` | Server health, credential count, and cache stats |
 
-### Write (require `REDDIT_USERNAME` and `REDDIT_PASSWORD`)
+### Write (require `REDDIT_USERS` or `REDDIT_USERNAME`/`REDDIT_PASSWORD`)
+
+All write tools require a `username` parameter specifying which configured user to act as. Call `reddit_get_server_status` to see available usernames.
 
 | Tool | Description |
 |---|---|
