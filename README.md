@@ -2,7 +2,7 @@
 
 ![reddit-mcp](docs/assets/cover.png)
 
-MCP server exposing Reddit search and browsing as tools. Uses AsyncPRAW with multi-credential rotation and per-credential rate limiting (55 req/min).
+MCP server exposing Reddit search, browsing, and write operations (posting, commenting, voting) as tools. Uses AsyncPRAW with multi-credential rotation and per-credential rate limiting (55 req/min).
 
 ## Prerequisites
 
