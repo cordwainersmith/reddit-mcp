@@ -51,6 +51,10 @@ class AuthenticationRequiredError(RedditMCPError):
     """Raised when a write tool is called but no user credentials are configured."""
 
 
+class UnknownUsernameError(RedditMCPError):
+    """Raised when the specified username is not in the configured REDDIT_USERS."""
+
+
 class SubmissionError(RedditMCPError):
     """Raised when post creation or submission fails."""
 
@@ -64,6 +68,7 @@ _ERROR_CODES: dict[type, str] = {
     UserNotFoundError: "NOT_FOUND",
     RateLimitExhaustedError: "RATE_LIMITED",
     AuthenticationRequiredError: "AUTH_REQUIRED",
+    UnknownUsernameError: "UNKNOWN_USER",
     CredentialError: "CREDENTIAL_ERROR",
     RedditAPIError: "API_ERROR",
     SubmissionError: "SUBMISSION_ERROR",

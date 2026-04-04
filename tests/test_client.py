@@ -13,6 +13,7 @@ from reddit_mcp.errors import (
     RedditAPIError,
     SubredditNotFoundError,
     SubmissionError,
+    UnknownUsernameError,
     UserNotFoundError,
     WikiPageNotFoundError,
 )
@@ -414,44 +415,51 @@ class TestCacheKeyNormalization:
             mock.assert_called_once_with("java+python", 25)  # same sorted order
 
 
-class TestAuthGuard:
-    """Test that _require_auth raises when credentials are not set."""
+class TestUserGuard:
+    """Test that _require_user validates configured usernames."""
 
-    def test_require_auth_no_credentials(self, client):
-        """Client without username/password should raise AuthenticationRequiredError."""
-        with pytest.raises(AuthenticationRequiredError, match="REDDIT_USERNAME"):
-            client._require_auth()
+    def test_require_user_no_users_configured(self, client):
+        """Client without any users should raise AuthenticationRequiredError."""
+        with pytest.raises(AuthenticationRequiredError, match="No Reddit users"):
+            client._require_user("anyuser")
 
-    def test_require_auth_with_credentials(self):
-        """Client with username/password should not raise."""
+    def test_require_user_valid_username(self):
+        """Client with users configured should not raise for a valid username."""
         authed_client = RedditClient(
             credentials=[("id1", "secret1")],
             user_agent="test/1.0",
-            username="testuser",
-            password="testpass",
+            users={"testuser": "testpass"},
         )
-        # Should not raise
-        authed_client._require_auth()
+        authed_client._require_user("testuser")
 
-    def test_require_auth_partial_credentials_username_only(self):
-        """Client with only username should raise."""
-        partial_client = RedditClient(
+    def test_require_user_unknown_username(self):
+        """Client should raise UnknownUsernameError for unconfigured username."""
+        authed_client = RedditClient(
             credentials=[("id1", "secret1")],
             user_agent="test/1.0",
-            username="testuser",
+            users={"testuser": "testpass", "other": "pass2"},
         )
-        with pytest.raises(AuthenticationRequiredError):
-            partial_client._require_auth()
+        with pytest.raises(UnknownUsernameError, match="'baduser'.*Available.*other, testuser"):
+            authed_client._require_user("baduser")
 
-    def test_require_auth_partial_credentials_password_only(self):
-        """Client with only password should raise."""
-        partial_client = RedditClient(
+    def test_require_user_legacy_single_user(self):
+        """Client with legacy username/password should work."""
+        legacy_client = RedditClient(
             credentials=[("id1", "secret1")],
             user_agent="test/1.0",
-            password="testpass",
+            username="legacyuser",
+            password="legacypass",
         )
-        with pytest.raises(AuthenticationRequiredError):
-            partial_client._require_auth()
+        legacy_client._require_user("legacyuser")
+
+    def test_available_usernames(self):
+        """available_usernames should return sorted list."""
+        multi_client = RedditClient(
+            credentials=[("id1", "secret1")],
+            user_agent="test/1.0",
+            users={"zeta": "p1", "alpha": "p2", "mid": "p3"},
+        )
+        assert multi_client.available_usernames == ["alpha", "mid", "zeta"]
 
 
 @pytest.fixture
@@ -460,8 +468,7 @@ def authed_client():
     return RedditClient(
         credentials=[("id1", "secret1")],
         user_agent="test/1.0",
-        username="testuser",
-        password="testpass",
+        users={"testuser": "testpass"},
     )
 
 
@@ -472,7 +479,7 @@ class TestWriteMethods:
     async def test_vote_no_auth(self, client):
         """Vote should raise AuthenticationRequiredError without credentials."""
         with pytest.raises(AuthenticationRequiredError):
-            await client.vote("test123", "post", "up")
+            await client.vote("test123", "post", "up", username="testuser")
 
     @pytest.mark.asyncio
     async def test_vote_upvote_post(self, authed_client):
@@ -480,8 +487,8 @@ class TestWriteMethods:
         mock_submission = AsyncMock()
         mock_reddit.submission = AsyncMock(return_value=mock_submission)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.vote("test123", "post", "up")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.vote("test123", "post", "up", username="testuser")
             assert result["success"] is True
             assert result["id"] == "test123"
             mock_submission.upvote.assert_called_once()
@@ -492,8 +499,8 @@ class TestWriteMethods:
         mock_comment = AsyncMock()
         mock_reddit.comment = AsyncMock(return_value=mock_comment)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.vote("c123", "comment", "down")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.vote("c123", "comment", "down", username="testuser")
             assert result["success"] is True
             mock_comment.downvote.assert_called_once()
 
@@ -503,8 +510,8 @@ class TestWriteMethods:
         mock_submission = AsyncMock()
         mock_reddit.submission = AsyncMock(return_value=mock_submission)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.vote("test123", "post", "clear")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.vote("test123", "post", "clear", username="testuser")
             assert result["success"] is True
             mock_submission.clear_vote.assert_called_once()
 
@@ -516,9 +523,9 @@ class TestWriteMethods:
         mock_reddit.submission = AsyncMock(
             side_effect=asyncprawcore.exceptions.NotFound(MagicMock())
         )
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             with pytest.raises(PostNotFoundError, match="not found"):
-                await authed_client.vote("bad", "post", "up")
+                await authed_client.vote("bad", "post", "up", username="testuser")
 
     @pytest.mark.asyncio
     async def test_vote_forbidden(self, authed_client):
@@ -528,14 +535,19 @@ class TestWriteMethods:
         mock_reddit.submission = AsyncMock(
             side_effect=asyncprawcore.exceptions.Forbidden(MagicMock())
         )
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             with pytest.raises(RedditAPIError, match="insufficient permissions"):
-                await authed_client.vote("test", "post", "up")
+                await authed_client.vote("test", "post", "up", username="testuser")
+
+    @pytest.mark.asyncio
+    async def test_vote_unknown_user(self, authed_client):
+        with pytest.raises(UnknownUsernameError, match="baduser"):
+            await authed_client.vote("test123", "post", "up", username="baduser")
 
     @pytest.mark.asyncio
     async def test_reply_to_post_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.reply_to_post("test123", "Hello!")
+            await client.reply_to_post("test123", "Hello!", username="testuser")
 
     @pytest.mark.asyncio
     async def test_reply_to_post_success(self, authed_client):
@@ -547,8 +559,8 @@ class TestWriteMethods:
         mock_submission.reply = AsyncMock(return_value=mock_comment)
         mock_reddit.submission = AsyncMock(return_value=mock_submission)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.reply_to_post("test123", "Hello!")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.reply_to_post("test123", "Hello!", username="testuser")
             assert result["success"] is True
             assert result["id"] == "new_comment"
             assert "reddit.com" in result["permalink"]
@@ -556,7 +568,7 @@ class TestWriteMethods:
     @pytest.mark.asyncio
     async def test_reply_to_comment_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.reply_to_comment("c123", "Reply!")
+            await client.reply_to_comment("c123", "Reply!", username="testuser")
 
     @pytest.mark.asyncio
     async def test_reply_to_comment_success(self, authed_client):
@@ -568,15 +580,15 @@ class TestWriteMethods:
         mock_parent.reply = AsyncMock(return_value=mock_reply)
         mock_reddit.comment = AsyncMock(return_value=mock_parent)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.reply_to_comment("c123", "Reply!")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.reply_to_comment("c123", "Reply!", username="testuser")
             assert result["success"] is True
             assert result["id"] == "new_reply"
 
     @pytest.mark.asyncio
     async def test_create_post_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.create_post("test", "Title", body="Body")
+            await client.create_post("test", "Title", username="testuser", body="Body")
 
     @pytest.mark.asyncio
     async def test_create_self_post_success(self, authed_client):
@@ -588,8 +600,8 @@ class TestWriteMethods:
         mock_subreddit.submit = AsyncMock(return_value=mock_submission)
         mock_reddit.subreddit = AsyncMock(return_value=mock_subreddit)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.create_post("test", "Title", body="Body content")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.create_post("test", "Title", username="testuser", body="Body content")
             assert result["success"] is True
             assert result["id"] == "new_post"
             mock_subreddit.submit.assert_called_once_with(title="Title", selftext="Body content")
@@ -604,8 +616,8 @@ class TestWriteMethods:
         mock_subreddit.submit = AsyncMock(return_value=mock_submission)
         mock_reddit.subreddit = AsyncMock(return_value=mock_subreddit)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.create_post("test", "Title", url="https://example.com")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.create_post("test", "Title", username="testuser", url="https://example.com")
             assert result["success"] is True
             mock_subreddit.submit.assert_called_once_with(title="Title", url="https://example.com")
 
@@ -619,9 +631,9 @@ class TestWriteMethods:
         mock_subreddit.submit = AsyncMock(return_value=mock_submission)
         mock_reddit.subreddit = AsyncMock(return_value=mock_subreddit)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             result = await authed_client.create_post(
-                "test", "Title", body="Body",
+                "test", "Title", username="testuser", body="Body",
                 flair_id="flair123", flair_text="Discussion",
             )
             assert result["success"] is True
@@ -643,14 +655,14 @@ class TestWriteMethods:
         )
         mock_reddit.subreddit = AsyncMock(return_value=mock_subreddit)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             with pytest.raises(SubmissionError, match="failed"):
-                await authed_client.create_post("nonexistent", "Title", body="Body")
+                await authed_client.create_post("nonexistent", "Title", username="testuser", body="Body")
 
     @pytest.mark.asyncio
     async def test_save_thing_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.save_thing("test123", "post")
+            await client.save_thing("test123", "post", username="testuser")
 
     @pytest.mark.asyncio
     async def test_save_post_success(self, authed_client):
@@ -658,8 +670,8 @@ class TestWriteMethods:
         mock_submission = AsyncMock()
         mock_reddit.submission = AsyncMock(return_value=mock_submission)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.save_thing("test123", "post")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.save_thing("test123", "post", username="testuser")
             assert result["success"] is True
             mock_submission.save.assert_called_once()
 
@@ -669,8 +681,8 @@ class TestWriteMethods:
         mock_comment = AsyncMock()
         mock_reddit.comment = AsyncMock(return_value=mock_comment)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.save_thing("c123", "comment", unsave=True)
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.save_thing("c123", "comment", username="testuser", unsave=True)
             assert result["success"] is True
             assert "unsaved" in result["message"]
             mock_comment.unsave.assert_called_once()
@@ -678,7 +690,7 @@ class TestWriteMethods:
     @pytest.mark.asyncio
     async def test_delete_thing_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.delete_thing("test123", "post")
+            await client.delete_thing("test123", "post", username="testuser")
 
     @pytest.mark.asyncio
     async def test_delete_post_success(self, authed_client):
@@ -686,15 +698,15 @@ class TestWriteMethods:
         mock_submission = AsyncMock()
         mock_reddit.submission = AsyncMock(return_value=mock_submission)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.delete_thing("test123", "post")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.delete_thing("test123", "post", username="testuser")
             assert result["success"] is True
             mock_submission.delete.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_edit_thing_no_auth(self, client):
         with pytest.raises(AuthenticationRequiredError):
-            await client.edit_thing("test123", "post", "New body")
+            await client.edit_thing("test123", "post", "New body", username="testuser")
 
     @pytest.mark.asyncio
     async def test_edit_comment_success(self, authed_client):
@@ -705,8 +717,8 @@ class TestWriteMethods:
         mock_comment.edit = AsyncMock(return_value=mock_edited)
         mock_reddit.comment = AsyncMock(return_value=mock_comment)
 
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
-            result = await authed_client.edit_thing("c123", "comment", "Updated text")
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
+            result = await authed_client.edit_thing("c123", "comment", "Updated text", username="testuser")
             assert result["success"] is True
             mock_comment.edit.assert_called_once_with("Updated text")
 
@@ -722,9 +734,9 @@ class TestWriteExceptionTranslation:
         mock_reddit.submission = AsyncMock(
             side_effect=asyncprawcore.exceptions.ServerError(MagicMock())
         )
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             with pytest.raises(RedditAPIError, match="server error"):
-                await authed_client.vote("test", "post", "up")
+                await authed_client.vote("test", "post", "up", username="testuser")
 
     @pytest.mark.asyncio
     async def test_write_timeout_error(self, authed_client):
@@ -734,6 +746,6 @@ class TestWriteExceptionTranslation:
         mock_reddit.submission = AsyncMock(
             side_effect=aio.TimeoutError()
         )
-        with patch.object(authed_client, "_get_reddit", return_value=mock_reddit):
+        with patch.object(authed_client, "_get_reddit_for_user", return_value=mock_reddit):
             with pytest.raises(RedditAPIError, match="Network error"):
-                await authed_client.vote("test", "post", "up")
+                await authed_client.vote("test", "post", "up", username="testuser")

@@ -12,6 +12,7 @@ from reddit_mcp.errors import (
     AuthenticationRequiredError,
     CredentialError,
     RateLimitExhaustedError,
+    UnknownUsernameError,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class RedditClient:
         user_agent: str,
         username: str | None = None,
         password: str | None = None,
+        users: dict[str, str] | None = None,
     ):
         if not credentials:
             raise CredentialError("At least one credential pair (client_id, client_secret) is required")
@@ -40,8 +42,13 @@ class RedditClient:
                     f"Credential at position {i + 1} has empty client_id or client_secret"
                 )
         self._user_agent = user_agent
-        self._username = username
-        self._password = password
+        # Multi-user support: prefer explicit users dict, fall back to legacy single-user
+        if users:
+            self._users = dict(users)
+        elif username and password:
+            self._users = {username: password}
+        else:
+            self._users = {}
         self._credentials = [
             RedditCredential(client_id=cid, client_secret=cs)
             for cid, cs in credentials
@@ -78,8 +85,15 @@ class RedditClient:
                 "All credentials have exhausted their rate limits. Try again later."
             )
 
+    def _build_ssl_kwargs(self, kwargs: dict[str, Any]) -> None:
+        """Add SSL bypass options to kwargs if REDDIT_MCP_IGNORE_SSL is set."""
+        if os.environ.get("REDDIT_MCP_IGNORE_SSL", "").lower() in ("1", "true", "yes"):
+            import aiohttp
+            connector = aiohttp.TCPConnector(ssl=False)
+            kwargs["requestor_kwargs"] = {"session": aiohttp.ClientSession(connector=connector)}
+
     async def _get_reddit(self) -> asyncpraw.Reddit:
-        """Get an AsyncPRAW client from the next available credential."""
+        """Get an unauthenticated AsyncPRAW client for read operations."""
         cred = await self._get_credential()
         if cred.reddit is None:
             kwargs: dict[str, Any] = {
@@ -87,35 +101,56 @@ class RedditClient:
                 "client_secret": cred.client_secret,
                 "user_agent": self._user_agent,
             }
-            if self._username and self._password:
-                kwargs["username"] = self._username
-                kwargs["password"] = self._password
-            if os.environ.get("REDDIT_MCP_IGNORE_SSL", "").lower() in ("1", "true", "yes"):
-                import aiohttp
-                connector = aiohttp.TCPConnector(ssl=False)
-                kwargs["requestor_kwargs"] = {"session": aiohttp.ClientSession(connector=connector)}
+            self._build_ssl_kwargs(kwargs)
             cred.reddit = asyncpraw.Reddit(**kwargs)
         return cred.reddit
 
-    def _require_auth(self) -> None:
-        """Raise AuthenticationRequiredError if user credentials are not configured."""
-        if not self._username or not self._password:
+    async def _get_reddit_for_user(self, username: str) -> asyncpraw.Reddit:
+        """Get an authenticated AsyncPRAW client for a specific user."""
+        self._require_user(username)
+        cred = await self._get_credential()
+        if username not in cred.user_reddit:
+            kwargs: dict[str, Any] = {
+                "client_id": cred.client_id,
+                "client_secret": cred.client_secret,
+                "user_agent": self._user_agent,
+                "username": username,
+                "password": self._users[username],
+            }
+            self._build_ssl_kwargs(kwargs)
+            cred.user_reddit[username] = asyncpraw.Reddit(**kwargs)
+        return cred.user_reddit[username]
+
+    def _require_user(self, username: str) -> None:
+        """Validate that the given username is configured for write operations."""
+        if not self._users:
             raise AuthenticationRequiredError(
-                "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD env vars. "
-                "Set these environment variables to enable voting, replying, and posting."
+                "No Reddit users are configured for write operations. "
+                "Set the REDDIT_USERS env var (format: user1:pass1,user2:pass2) "
+                "or REDDIT_USERNAME and REDDIT_PASSWORD for single-user mode."
+            )
+        if username not in self._users:
+            available = ", ".join(sorted(self._users.keys()))
+            raise UnknownUsernameError(
+                f"Username '{username}' is not configured. "
+                f"Available usernames: {available}"
             )
 
-    async def _resolve_thing(self, thing_id: str, thing_type: str):
+    async def _resolve_thing(self, thing_id: str, thing_type: str, username: str | None = None):
         """Resolve a post or comment by ID and type.
 
         Args:
             thing_id: The ID of the post or comment.
             thing_type: Either "post" or "comment".
+            username: If provided, use an authenticated client for this user.
 
         Returns:
             The asyncpraw Submission or Comment object.
         """
-        reddit = await self._get_reddit()
+        if username:
+            reddit = await self._get_reddit_for_user(username)
+        else:
+            reddit = await self._get_reddit()
         if thing_type == "post":
             return await reddit.submission(id=thing_id)
         thing = await reddit.comment(id=thing_id)
@@ -127,18 +162,32 @@ class RedditClient:
             if cred.reddit:
                 await cred.reddit.close()
                 cred.reddit = None
+            for reddit in cred.user_reddit.values():
+                await reddit.close()
+            cred.user_reddit.clear()
 
-    def credentials_status(self) -> list[dict[str, Any]]:
-        """Return diagnostic info about all credentials for server status."""
-        return [
-            {
-                "index": i,
-                "request_count": cred.request_count,
-                "seconds_until_reset": round(cred.seconds_until_reset(), 1),
-                "is_available": cred.is_available(),
-            }
-            for i, cred in enumerate(self._credentials)
-        ]
+    @property
+    def available_usernames(self) -> list[str]:
+        """Return sorted list of configured usernames."""
+        return sorted(self._users.keys())
+
+    def credentials_status(self) -> dict[str, Any]:
+        """Return diagnostic info about credentials and users for server status."""
+        return {
+            "credentials": [
+                {
+                    "index": i,
+                    "request_count": cred.request_count,
+                    "seconds_until_reset": round(cred.seconds_until_reset(), 1),
+                    "is_available": cred.is_available(),
+                }
+                for i, cred in enumerate(self._credentials)
+            ],
+            "users": {
+                "configured_usernames": self.available_usernames,
+                "count": len(self._users),
+            },
+        }
 
     async def __aenter__(self) -> "RedditClient":
         return self

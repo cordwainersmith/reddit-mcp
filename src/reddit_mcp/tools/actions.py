@@ -13,6 +13,7 @@ from reddit_mcp.validators import (
     validate_subreddit_name,
     validate_thing_type,
     validate_url,
+    validate_username,
     validate_vote_direction,
 )
 
@@ -23,6 +24,7 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
     @mcp.tool()
     @handle_tool_errors
     async def reddit_vote(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         thing_id: Annotated[str, "The ID of the post or comment to vote on (without t1_/t3_ prefix)"],
         thing_type: Annotated[str, "Type of thing to vote on: 'post' or 'comment'"],
         direction: Annotated[str, "Vote direction: 'up' (upvote), 'down' (downvote), or 'clear' (remove vote)"],
@@ -30,11 +32,13 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         """
         Upvote, downvote, or clear vote on a Reddit post or comment.
 
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|API_ERROR"}
         """
+        username = validate_username(username)
         thing_type = validate_thing_type(thing_type)
         direction = validate_vote_direction(direction)
 
@@ -43,11 +47,13 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
             thing_id=thing_id.strip(),
             thing_type=thing_type,
             direction=direction,
+            username=username,
         )
 
     @mcp.tool()
     @handle_tool_errors
     async def reddit_reply(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         thing_id: Annotated[str, "The ID of the post or comment to reply to (without t1_/t3_ prefix)"],
         thing_type: Annotated[str, "Type of thing to reply to: 'post' (top-level comment) or 'comment' (nested reply)"],
         body: Annotated[str, "The markdown body of your reply"],
@@ -56,22 +62,25 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         Reply to a Reddit post or comment.
 
         Use thing_type 'post' to add a top-level comment, or 'comment' to add a nested reply.
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|API_ERROR"}
         """
+        username = validate_username(username)
         thing_type = validate_thing_type(thing_type)
         body = validate_body_text(body)
 
         client = await get_client()
         if thing_type == "post":
-            return await client.reply_to_post(post_id=thing_id.strip(), body=body)
-        return await client.reply_to_comment(comment_id=thing_id.strip(), body=body)
+            return await client.reply_to_post(post_id=thing_id.strip(), body=body, username=username)
+        return await client.reply_to_comment(comment_id=thing_id.strip(), body=body, username=username)
 
     @mcp.tool()
     @handle_tool_errors
     async def reddit_create_post(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         subreddit: Annotated[str, "Subreddit name to post in (without r/ prefix)"],
         title: Annotated[str, "Post title (max 300 characters)"],
         body: Annotated[str | None, "Self-post body text (markdown). Mutually exclusive with url."] = None,
@@ -83,11 +92,13 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         Create a new Reddit post (self-post or link post) in a subreddit.
 
         Provide either 'body' for a self-post or 'url' for a link post, not both.
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|SUBMISSION_ERROR|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|SUBMISSION_ERROR|API_ERROR"}
         """
+        username = validate_username(username)
         subreddit = validate_subreddit_name(subreddit)
         title = validate_post_title(title)
 
@@ -105,6 +116,7 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         return await client.create_post(
             subreddit_name=subreddit,
             title=title,
+            username=username,
             body=body,
             url=url,
             flair_id=flair_id,
@@ -114,6 +126,7 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
     @mcp.tool()
     @handle_tool_errors
     async def reddit_save(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         thing_id: Annotated[str, "The ID of the post or comment to save/unsave (without t1_/t3_ prefix)"],
         thing_type: Annotated[str, "Type of thing: 'post' or 'comment'"],
         unsave: Annotated[bool, "Set to true to unsave a previously saved item"] = False,
@@ -121,59 +134,69 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         """
         Save or unsave a Reddit post or comment for later reference.
 
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|API_ERROR"}
         """
+        username = validate_username(username)
         thing_type = validate_thing_type(thing_type)
 
         client = await get_client()
         return await client.save_thing(
             thing_id=thing_id.strip(),
             thing_type=thing_type,
+            username=username,
             unsave=unsave,
         )
 
     @mcp.tool()
     @handle_tool_errors
     async def reddit_delete(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         thing_id: Annotated[str, "The ID of the post or comment to delete (without t1_/t3_ prefix)"],
         thing_type: Annotated[str, "Type of thing to delete: 'post' or 'comment'"],
     ) -> dict:
         """
-        Delete a Reddit post or comment authored by the authenticated user.
+        Delete a Reddit post or comment authored by the specified user.
 
         This action is permanent and cannot be undone.
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|API_ERROR"}
         """
+        username = validate_username(username)
         thing_type = validate_thing_type(thing_type)
 
         client = await get_client()
         return await client.delete_thing(
             thing_id=thing_id.strip(),
             thing_type=thing_type,
+            username=username,
         )
 
     @mcp.tool()
     @handle_tool_errors
     async def reddit_edit(
+        username: Annotated[str, "Reddit username to act as. Must match a configured username from reddit_get_server_status."],
         thing_id: Annotated[str, "The ID of the post or comment to edit (without t1_/t3_ prefix)"],
         thing_type: Annotated[str, "Type of thing to edit: 'post' or 'comment'"],
         body: Annotated[str, "The new markdown body text"],
     ) -> dict:
         """
-        Edit a Reddit post or comment authored by the authenticated user.
+        Edit a Reddit post or comment authored by the specified user.
 
         Only self-posts can be edited (not link posts).
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+        The 'username' parameter specifies which configured Reddit user performs this action.
+        Call reddit_get_server_status to see available usernames.
 
         Returns: {success, id, permalink, message}.
-        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|UNKNOWN_USER|API_ERROR"}
         """
+        username = validate_username(username)
         thing_type = validate_thing_type(thing_type)
         body = validate_body_text(body)
 
@@ -182,4 +205,5 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
             thing_id=thing_id.strip(),
             thing_type=thing_type,
             body=body,
+            username=username,
         )

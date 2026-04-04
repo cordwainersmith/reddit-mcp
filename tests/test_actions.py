@@ -9,6 +9,7 @@ from reddit_mcp.errors import (
     PostNotFoundError,
     RedditAPIError,
     SubmissionError,
+    UnknownUsernameError,
 )
 
 
@@ -39,7 +40,7 @@ class TestVoteTool:
     @pytest.mark.asyncio
     async def test_vote_invalid_direction(self, action_funcs):
         result = await action_funcs["reddit_vote"](
-            thing_id="test123", thing_type="post", direction="sideways"
+            username="testuser", thing_id="test123", thing_type="post", direction="sideways"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -47,7 +48,7 @@ class TestVoteTool:
     @pytest.mark.asyncio
     async def test_vote_invalid_thing_type(self, action_funcs):
         result = await action_funcs["reddit_vote"](
-            thing_id="test123", thing_type="subreddit", direction="up"
+            username="testuser", thing_id="test123", thing_type="subreddit", direction="up"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -66,7 +67,7 @@ class TestVoteTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_vote"](
-            thing_id="test123", thing_type="post", direction="up"
+            username="testuser", thing_id="test123", thing_type="post", direction="up"
         )
         assert result["success"] is True
         mock_client.vote.assert_called_once()
@@ -85,10 +86,29 @@ class TestVoteTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_vote"](
-            thing_id="test123", thing_type="post", direction="up"
+            username="testuser", thing_id="test123", thing_type="post", direction="up"
         )
         assert "error" in result
         assert result["error_type"] == "AUTH_REQUIRED"
+
+    @pytest.mark.asyncio
+    async def test_vote_unknown_user(self):
+        from reddit_mcp.tools.actions import register_action_tools
+
+        mock_client = AsyncMock()
+        mock_client.vote = AsyncMock(
+            side_effect=UnknownUsernameError("Username 'baduser' is not configured.")
+        )
+
+        async def async_get_client():
+            return mock_client
+
+        funcs = register_and_capture(register_action_tools, async_get_client)
+        result = await funcs["reddit_vote"](
+            username="baduser", thing_id="test123", thing_type="post", direction="up"
+        )
+        assert "error" in result
+        assert result["error_type"] == "UNKNOWN_USER"
 
 
 class TestReplyTool:
@@ -98,7 +118,7 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_reply"](
-            thing_id="test123", thing_type="post", body=""
+            username="testuser", thing_id="test123", thing_type="post", body=""
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -109,7 +129,7 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_reply"](
-            thing_id="test123", thing_type="post", body="x" * 40_001
+            username="testuser", thing_id="test123", thing_type="post", body="x" * 40_001
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -120,7 +140,7 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_reply"](
-            thing_id="test123", thing_type="subreddit", body="Hello"
+            username="testuser", thing_id="test123", thing_type="subreddit", body="Hello"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -141,12 +161,12 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_reply"](
-            thing_id="test123", thing_type="post", body="Great post!"
+            username="testuser", thing_id="test123", thing_type="post", body="Great post!"
         )
         assert result["success"] is True
         assert result["id"] == "new_comment"
         mock_client.reply_to_post.assert_called_once_with(
-            post_id="test123", body="Great post!"
+            post_id="test123", body="Great post!", username="testuser"
         )
 
     @pytest.mark.asyncio
@@ -165,12 +185,12 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_reply"](
-            thing_id="c123", thing_type="comment", body="Thanks!"
+            username="testuser", thing_id="c123", thing_type="comment", body="Thanks!"
         )
         assert result["success"] is True
         assert result["id"] == "new_reply"
         mock_client.reply_to_comment.assert_called_once_with(
-            comment_id="c123", body="Thanks!"
+            comment_id="c123", body="Thanks!", username="testuser"
         )
 
     @pytest.mark.asyncio
@@ -187,7 +207,7 @@ class TestReplyTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_reply"](
-            thing_id="bad", thing_type="post", body="Hello"
+            username="testuser", thing_id="bad", thing_type="post", body="Hello"
         )
         assert result["error_type"] == "NOT_FOUND"
 
@@ -201,7 +221,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_both_body_and_url(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="test", title="Title",
+            username="testuser", subreddit="test", title="Title",
             body="Body", url="https://example.com"
         )
         assert "error" in result
@@ -211,7 +231,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_neither_body_nor_url(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="test", title="Title"
+            username="testuser", subreddit="test", title="Title"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -219,7 +239,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_invalid_subreddit(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="invalid subreddit!", title="Title", body="Body"
+            username="testuser", subreddit="invalid subreddit!", title="Title", body="Body"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -227,7 +247,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_title_too_long(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="test", title="A" * 301, body="Body"
+            username="testuser", subreddit="test", title="A" * 301, body="Body"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -235,7 +255,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_empty_title(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="test", title="", body="Body"
+            username="testuser", subreddit="test", title="", body="Body"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -243,7 +263,7 @@ class TestCreatePostTool:
     @pytest.mark.asyncio
     async def test_create_post_invalid_url(self, action_funcs):
         result = await action_funcs["reddit_create_post"](
-            subreddit="test", title="Title", url="not-a-url"
+            username="testuser", subreddit="test", title="Title", url="not-a-url"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -264,7 +284,7 @@ class TestCreatePostTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_create_post"](
-            subreddit="test", title="My Post", body="Content here"
+            username="testuser", subreddit="test", title="My Post", body="Content here"
         )
         assert result["success"] is True
         assert result["id"] == "new_post"
@@ -285,7 +305,7 @@ class TestCreatePostTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_create_post"](
-            subreddit="test", title="Check this out",
+            username="testuser", subreddit="test", title="Check this out",
             url="https://example.com/article"
         )
         assert result["success"] is True
@@ -304,7 +324,7 @@ class TestCreatePostTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_create_post"](
-            subreddit="test", title="Title", body="Body"
+            username="testuser", subreddit="test", title="Title", body="Body"
         )
         assert result["error_type"] == "SUBMISSION_ERROR"
 
@@ -316,7 +336,7 @@ class TestSaveTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_save"](
-            thing_id="test123", thing_type="subreddit"
+            username="testuser", thing_id="test123", thing_type="subreddit"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -336,11 +356,11 @@ class TestSaveTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_save"](
-            thing_id="test123", thing_type="post"
+            username="testuser", thing_id="test123", thing_type="post"
         )
         assert result["success"] is True
         mock_client.save_thing.assert_called_once_with(
-            thing_id="test123", thing_type="post", unsave=False
+            thing_id="test123", thing_type="post", username="testuser", unsave=False
         )
 
     @pytest.mark.asyncio
@@ -358,11 +378,11 @@ class TestSaveTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_save"](
-            thing_id="test123", thing_type="comment", unsave=True
+            username="testuser", thing_id="test123", thing_type="comment", unsave=True
         )
         assert result["success"] is True
         mock_client.save_thing.assert_called_once_with(
-            thing_id="test123", thing_type="comment", unsave=True
+            thing_id="test123", thing_type="comment", username="testuser", unsave=True
         )
 
 
@@ -373,7 +393,7 @@ class TestDeleteTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_delete"](
-            thing_id="test123", thing_type="wiki"
+            username="testuser", thing_id="test123", thing_type="wiki"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -393,7 +413,7 @@ class TestDeleteTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_delete"](
-            thing_id="test123", thing_type="post"
+            username="testuser", thing_id="test123", thing_type="post"
         )
         assert result["success"] is True
 
@@ -411,7 +431,7 @@ class TestDeleteTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_delete"](
-            thing_id="test123", thing_type="comment"
+            username="testuser", thing_id="test123", thing_type="comment"
         )
         assert result["error_type"] == "AUTH_REQUIRED"
 
@@ -423,7 +443,7 @@ class TestEditTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_edit"](
-            thing_id="test123", thing_type="comment", body=""
+            username="testuser", thing_id="test123", thing_type="comment", body=""
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -434,7 +454,7 @@ class TestEditTool:
 
         funcs = register_and_capture(register_action_tools)
         result = await funcs["reddit_edit"](
-            thing_id="test123", thing_type="message", body="Updated"
+            username="testuser", thing_id="test123", thing_type="message", body="Updated"
         )
         assert "error" in result
         assert result["error_type"] == "INVALID_INPUT"
@@ -455,7 +475,7 @@ class TestEditTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_edit"](
-            thing_id="test123", thing_type="post", body="New content"
+            username="testuser", thing_id="test123", thing_type="post", body="New content"
         )
         assert result["success"] is True
 
@@ -473,7 +493,7 @@ class TestEditTool:
 
         funcs = register_and_capture(register_action_tools, async_get_client)
         result = await funcs["reddit_edit"](
-            thing_id="test123", thing_type="comment", body="Updated"
+            username="testuser", thing_id="test123", thing_type="comment", body="Updated"
         )
         assert result["error_type"] == "API_ERROR"
 

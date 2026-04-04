@@ -12,6 +12,7 @@ async def vote(
     thing_id: str,
     thing_type: str,
     direction: str,
+    username: str,
 ) -> ActionResultDict:
     """Vote on a post or comment.
 
@@ -19,10 +20,11 @@ async def vote(
         thing_id: The ID of the post or comment.
         thing_type: Either "post" or "comment".
         direction: One of "up", "down", "clear".
+        username: The configured Reddit username to act as.
     """
-    self._require_auth()
+    self._require_user(username)
     async with translate_write_exceptions(f"Vote on {thing_type} '{thing_id}'"):
-        thing = await self._resolve_thing(thing_id, thing_type)
+        thing = await self._resolve_thing(thing_id, thing_type, username=username)
 
         if direction == "up":
             await thing.upvote()
@@ -43,15 +45,17 @@ async def reply_to_post(
     self: RedditClient,
     post_id: str,
     body: str,
+    username: str,
 ) -> ActionResultDict:
     """Submit a top-level comment on a post.
 
     Args:
         post_id: The ID of the post to reply to.
         body: The markdown body of the comment.
+        username: The configured Reddit username to act as.
     """
-    self._require_auth()
-    reddit = await self._get_reddit()
+    self._require_user(username)
+    reddit = await self._get_reddit_for_user(username)
     async with translate_write_exceptions(f"Reply to post '{post_id}'"):
         submission = await reddit.submission(id=post_id)
         comment = await submission.reply(body)
@@ -68,15 +72,17 @@ async def reply_to_comment(
     self: RedditClient,
     comment_id: str,
     body: str,
+    username: str,
 ) -> ActionResultDict:
     """Submit a reply to an existing comment.
 
     Args:
         comment_id: The ID of the comment to reply to.
         body: The markdown body of the reply.
+        username: The configured Reddit username to act as.
     """
-    self._require_auth()
-    reddit = await self._get_reddit()
+    self._require_user(username)
+    reddit = await self._get_reddit_for_user(username)
     async with translate_write_exceptions(f"Reply to comment '{comment_id}'"):
         comment = await reddit.comment(id=comment_id)
         await comment.refresh()
@@ -94,6 +100,7 @@ async def create_post(
     self: RedditClient,
     subreddit_name: str,
     title: str,
+    username: str,
     body: str | None = None,
     url: str | None = None,
     flair_id: str | None = None,
@@ -104,13 +111,14 @@ async def create_post(
     Args:
         subreddit_name: The subreddit to post to.
         title: The post title.
+        username: The configured Reddit username to act as.
         body: Self-post body text (mutually exclusive with url).
         url: Link URL (mutually exclusive with body).
         flair_id: Optional flair ID.
         flair_text: Optional flair text.
     """
-    self._require_auth()
-    reddit = await self._get_reddit()
+    self._require_user(username)
+    reddit = await self._get_reddit_for_user(username)
     async with translate_write_exceptions(f"Create post in r/{subreddit_name}"):
         subreddit = await reddit.subreddit(subreddit_name)
         kwargs: dict[str, Any] = {"title": title}
@@ -139,6 +147,7 @@ async def save_thing(
     self: RedditClient,
     thing_id: str,
     thing_type: str,
+    username: str,
     unsave: bool = False,
 ) -> ActionResultDict:
     """Save or unsave a post or comment.
@@ -146,12 +155,13 @@ async def save_thing(
     Args:
         thing_id: The ID of the post or comment.
         thing_type: Either "post" or "comment".
+        username: The configured Reddit username to act as.
         unsave: If True, unsave instead of save.
     """
-    self._require_auth()
+    self._require_user(username)
     action = "unsave" if unsave else "save"
     async with translate_write_exceptions(f"{action.title()} {thing_type} '{thing_id}'"):
-        thing = await self._resolve_thing(thing_id, thing_type)
+        thing = await self._resolve_thing(thing_id, thing_type, username=username)
 
         if unsave:
             await thing.unsave()
@@ -170,16 +180,18 @@ async def delete_thing(
     self: RedditClient,
     thing_id: str,
     thing_type: str,
+    username: str,
 ) -> ActionResultDict:
     """Delete a post or comment authored by the authenticated user.
 
     Args:
         thing_id: The ID of the post or comment.
         thing_type: Either "post" or "comment".
+        username: The configured Reddit username to act as.
     """
-    self._require_auth()
+    self._require_user(username)
     async with translate_write_exceptions(f"Delete {thing_type} '{thing_id}'"):
-        thing = await self._resolve_thing(thing_id, thing_type)
+        thing = await self._resolve_thing(thing_id, thing_type, username=username)
         await thing.delete()
         return {
             "success": True,
@@ -194,6 +206,7 @@ async def edit_thing(
     thing_id: str,
     thing_type: str,
     body: str,
+    username: str,
 ) -> ActionResultDict:
     """Edit a post or comment authored by the authenticated user.
 
@@ -201,10 +214,11 @@ async def edit_thing(
         thing_id: The ID of the post or comment.
         thing_type: Either "post" or "comment".
         body: The new markdown body text.
+        username: The configured Reddit username to act as.
     """
-    self._require_auth()
+    self._require_user(username)
     async with translate_write_exceptions(f"Edit {thing_type} '{thing_id}'"):
-        thing = await self._resolve_thing(thing_id, thing_type)
+        thing = await self._resolve_thing(thing_id, thing_type, username=username)
         edited = await thing.edit(body)
         permalink = getattr(edited, "permalink", "")
         if permalink and not permalink.startswith("http"):

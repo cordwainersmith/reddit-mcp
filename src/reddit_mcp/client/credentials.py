@@ -13,6 +13,7 @@ class RedditCredential:
     client_id: str
     client_secret: str
     reddit: "asyncpraw.Reddit | None" = None
+    user_reddit: dict[str, "asyncpraw.Reddit"] = field(default_factory=dict)
     request_count: int = 0
     window_start: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 

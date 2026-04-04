@@ -59,14 +59,33 @@ async def get_client() -> RedditClient:
                 "Format: client_id1:secret1,client_id2:secret2"
             )
 
+        # Parse REDDIT_USERS for multi-user write operations
+        users: dict[str, str] = {}
+        users_raw = os.environ.get("REDDIT_USERS", "")
+        if users_raw:
+            for i, entry in enumerate(users_raw.split(",")):
+                entry = entry.strip()
+                if not entry:
+                    continue
+                parts = entry.split(":", 1)
+                if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                    raise CredentialError(
+                        f"Malformed user entry at position {i + 1} in REDDIT_USERS. "
+                        "Each entry must be exactly 'username:password'."
+                    )
+                users[parts[0].strip()] = parts[1].strip()
+
+        # Backward compat: single-user fallback via REDDIT_USERNAME/REDDIT_PASSWORD
+        legacy_username = os.environ.get("REDDIT_USERNAME") or None
+        legacy_password = os.environ.get("REDDIT_PASSWORD") or None
+        if legacy_username and legacy_password and legacy_username not in users:
+            users[legacy_username] = legacy_password
+
         user_agent = os.environ.get("REDDIT_USER_AGENT", "reddit-mcp/1.0")
-        username = os.environ.get("REDDIT_USERNAME") or None
-        password = os.environ.get("REDDIT_PASSWORD") or None
         _client = RedditClient(
             credentials=credentials,
             user_agent=user_agent,
-            username=username,
-            password=password,
+            users=users if users else None,
         )
     return _client
 
@@ -88,16 +107,22 @@ register_all_tools(mcp, get_client)
 @handle_tool_errors
 async def reddit_get_server_status() -> dict:
     """
-    Get Reddit MCP server health and diagnostics.
+    Get Reddit MCP server health, diagnostics, and available usernames for write operations.
 
-    Use this to check if the server is working and inspect credential/cache state.
+    Use this to check server health and discover which usernames can be passed to write tools
+    (reddit_vote, reddit_reply, reddit_create_post, reddit_save, reddit_delete, reddit_edit).
 
-    Returns: {"credentials": {count, active, ...}, "cache_stats": {hits, misses, ...}}.
+    Returns: {
+        "credentials": [{index, request_count, seconds_until_reset, is_available}],
+        "users": {"configured_usernames": [...], "count": N},
+        "cache_stats": {...}
+    }.
     On error: {"error": "...", "error_type": "CREDENTIAL_ERROR|INTERNAL_ERROR"}
     """
     client = await get_client()
+    status = client.credentials_status()
     return {
-        "credentials": client.credentials_status(),
+        **status,
         "cache_stats": cache_stats(),
     }
 
