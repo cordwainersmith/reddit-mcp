@@ -31,6 +31,9 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         Upvote, downvote, or clear vote on a Reddit post or comment.
 
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
         """
         thing_type = validate_thing_type(thing_type)
         direction = validate_vote_direction(direction)
@@ -44,35 +47,27 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
 
     @mcp.tool()
     @handle_tool_errors
-    async def reddit_reply_to_post(
-        post_id: Annotated[str, "The ID of the post to reply to (without t3_ prefix)"],
-        body: Annotated[str, "The markdown body of your comment"],
-    ) -> dict:
-        """
-        Reply to a Reddit post with a top-level comment.
-
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
-        """
-        body = validate_body_text(body)
-
-        client = await get_client()
-        return await client.reply_to_post(post_id=post_id.strip(), body=body)
-
-    @mcp.tool()
-    @handle_tool_errors
-    async def reddit_reply_to_comment(
-        comment_id: Annotated[str, "The ID of the comment to reply to (without t1_ prefix)"],
+    async def reddit_reply(
+        thing_id: Annotated[str, "The ID of the post or comment to reply to (without t1_/t3_ prefix)"],
+        thing_type: Annotated[str, "Type of thing to reply to: 'post' (top-level comment) or 'comment' (nested reply)"],
         body: Annotated[str, "The markdown body of your reply"],
     ) -> dict:
         """
-        Reply to a Reddit comment with a nested reply.
+        Reply to a Reddit post or comment.
 
+        Use thing_type 'post' to add a top-level comment, or 'comment' to add a nested reply.
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
         """
+        thing_type = validate_thing_type(thing_type)
         body = validate_body_text(body)
 
         client = await get_client()
-        return await client.reply_to_comment(comment_id=comment_id.strip(), body=body)
+        if thing_type == "post":
+            return await client.reply_to_post(post_id=thing_id.strip(), body=body)
+        return await client.reply_to_comment(comment_id=thing_id.strip(), body=body)
 
     @mcp.tool()
     @handle_tool_errors
@@ -81,7 +76,7 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         title: Annotated[str, "Post title (max 300 characters)"],
         body: Annotated[str | None, "Self-post body text (markdown). Mutually exclusive with url."] = None,
         url: Annotated[str | None, "Link URL for link posts. Mutually exclusive with body."] = None,
-        flair_id: Annotated[str | None, "Optional flair ID for the post"] = None,
+        flair_id: Annotated[str | None, "Optional flair ID (UUID from subreddit flair settings)"] = None,
         flair_text: Annotated[str | None, "Optional flair text for the post"] = None,
     ) -> dict:
         """
@@ -89,6 +84,9 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
 
         Provide either 'body' for a self-post or 'url' for a link post, not both.
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|SUBMISSION_ERROR|API_ERROR"}
         """
         subreddit = validate_subreddit_name(subreddit)
         title = validate_post_title(title)
@@ -116,13 +114,17 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
     @mcp.tool()
     @handle_tool_errors
     async def reddit_save(
-        thing_id: Annotated[str, "The ID of the post or comment to save (without t1_/t3_ prefix)"],
-        thing_type: Annotated[str, "Type of thing to save: 'post' or 'comment'"],
+        thing_id: Annotated[str, "The ID of the post or comment to save/unsave (without t1_/t3_ prefix)"],
+        thing_type: Annotated[str, "Type of thing: 'post' or 'comment'"],
+        unsave: Annotated[bool, "Set to true to unsave a previously saved item"] = False,
     ) -> dict:
         """
-        Save a Reddit post or comment for later reference.
+        Save or unsave a Reddit post or comment for later reference.
 
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
         """
         thing_type = validate_thing_type(thing_type)
 
@@ -130,27 +132,7 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
         return await client.save_thing(
             thing_id=thing_id.strip(),
             thing_type=thing_type,
-            unsave=False,
-        )
-
-    @mcp.tool()
-    @handle_tool_errors
-    async def reddit_unsave(
-        thing_id: Annotated[str, "The ID of the post or comment to unsave (without t1_/t3_ prefix)"],
-        thing_type: Annotated[str, "Type of thing to unsave: 'post' or 'comment'"],
-    ) -> dict:
-        """
-        Unsave a previously saved Reddit post or comment.
-
-        Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
-        """
-        thing_type = validate_thing_type(thing_type)
-
-        client = await get_client()
-        return await client.save_thing(
-            thing_id=thing_id.strip(),
-            thing_type=thing_type,
-            unsave=True,
+            unsave=unsave,
         )
 
     @mcp.tool()
@@ -164,6 +146,9 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
 
         This action is permanent and cannot be undone.
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
         """
         thing_type = validate_thing_type(thing_type)
 
@@ -185,6 +170,9 @@ def register_action_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
 
         Only self-posts can be edited (not link posts).
         Requires REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+
+        Returns: {success, id, permalink, message}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|AUTH_REQUIRED|API_ERROR"}
         """
         thing_type = validate_thing_type(thing_type)
         body = validate_body_text(body)

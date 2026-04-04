@@ -22,6 +22,9 @@ def register_subreddit_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Re
         Get metadata about a Reddit subreddit: subscriber count, description, active users.
 
         Use this for context before searching or browsing a specific subreddit.
+
+        Returns: {name, title, description, subscribers, active_users, created_utc, over_18, url}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         subreddit = validate_subreddit_name(subreddit)
 
@@ -38,6 +41,9 @@ def register_subreddit_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Re
         Read a wiki page from a Reddit subreddit.
 
         Many subreddits maintain FAQs, tool lists, and guides in their wikis.
+
+        Returns: {name, content_md, revision_date, revision_by}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         subreddit = validate_subreddit_name(subreddit)
         page = validate_wiki_page_name(page)
@@ -54,6 +60,9 @@ def register_subreddit_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Re
         List available wiki pages in a Reddit subreddit.
 
         Use this to discover what wiki content a subreddit offers before fetching specific pages.
+
+        Returns: List of wiki page name strings (e.g. ["index", "faq", "rules"]).
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         subreddit = validate_subreddit_name(subreddit)
 

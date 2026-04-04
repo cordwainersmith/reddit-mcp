@@ -23,15 +23,20 @@ def register_post_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
     @mcp.tool()
     @handle_tool_errors
     async def reddit_get_subreddit_posts(
-        subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'"],
+        subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'. Use 'popular' for site-wide trending posts."],
         sort: Annotated[str, "Sort: hot, new, top, rising"] = "hot",
-        time_filter: Annotated[str, "Time filter for 'top' sort: hour, day, week, month, year, all"] = "week",
+        time_filter: Annotated[str, "Time filter for 'top' sort only: hour, day, week, month, year, all. Ignored for other sort orders."] = "week",
         limit: Annotated[int, "Max posts (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
         Browse Reddit posts from one or more subreddits by sort order.
 
         Use this to see what's currently active or popular in specific Reddit communities.
+        To get site-wide trending posts, pass subreddit 'popular' with sort 'hot'.
+
+        Returns: List of post dicts, each with keys: id, title, body, subreddit, author,
+        score, num_comments, created_utc, url, permalink, upvote_ratio, is_self, post_type.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         sort = validate_sort(sort, POST_SORT_OPTIONS, "post sort")
         time_filter = validate_time_filter(time_filter)
@@ -56,6 +61,10 @@ def register_post_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
         Fetch a specific Reddit post by ID, optionally with its top comments.
 
         Use this to deep-dive into a Reddit discussion found via search or browsing.
+
+        Returns: {"post": {id, title, body, author, score, ...}, "comments": [{id, author, body, score, ...}, ...]}
+        Comments key is omitted when include_comments is False.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         comment_sort = validate_sort(comment_sort, COMMENT_SORT_OPTIONS, "comment sort")
         comment_limit = validate_limit(comment_limit, max_val=200)
@@ -81,6 +90,9 @@ def register_post_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
         Fetch multiple Reddit posts by their IDs in a single call.
 
         More efficient than calling reddit_get_post_details repeatedly when you have several post IDs.
+
+        Returns: List of {"post": {id, title, body, ...}, "comments": [...]} dicts.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         comment_limit = validate_limit(comment_limit, max_val=50)
 
@@ -96,18 +108,3 @@ def register_post_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
             include_comments=include_comments,
             comment_limit=comment_limit,
         )
-
-    @mcp.tool()
-    @handle_tool_errors
-    async def reddit_get_trending_posts(
-        limit: Annotated[int, "Max posts (1-100)"] = 25,
-    ) -> list[dict] | dict:
-        """
-        Get popular and trending posts across all of Reddit right now.
-
-        Use this to see what's currently hot site-wide on Reddit.
-        """
-        limit = validate_limit(limit)
-
-        client = await get_client()
-        return await client.get_posts(subreddits=["popular"], sort="hot", limit=limit)

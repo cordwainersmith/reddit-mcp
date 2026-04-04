@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 
 from reddit_mcp.cache import cache_stats
 from reddit_mcp.client import RedditClient
-from reddit_mcp.errors import CredentialError
+from reddit_mcp.errors import CredentialError, handle_tool_errors
 from reddit_mcp.tools import register_all_tools
 
 load_dotenv()
@@ -85,11 +85,15 @@ register_all_tools(mcp, get_client)
 
 
 @mcp.tool()
+@handle_tool_errors
 async def reddit_get_server_status() -> dict:
     """
     Get Reddit MCP server health and diagnostics.
 
-    Returns credential count, cache hit/miss stats, and configuration info.
+    Use this to check if the server is working and inspect credential/cache state.
+
+    Returns: {"credentials": {count, active, ...}, "cache_stats": {hits, misses, ...}}.
+    On error: {"error": "...", "error_type": "CREDENTIAL_ERROR|INTERNAL_ERROR"}
     """
     client = await get_client()
     return {

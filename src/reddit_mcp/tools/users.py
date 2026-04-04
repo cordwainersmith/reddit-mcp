@@ -28,6 +28,10 @@ def register_user_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
         Get metadata about a Reddit user: karma, account age, verified status.
 
         Use this to understand a Reddit user's profile before looking at their posts or comments.
+
+        Returns: {name, id, comment_karma, link_karma, created_utc, has_verified_email,
+        is_mod, is_gold, icon_img, subreddit}.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         username = validate_username(username)
 
@@ -39,13 +43,17 @@ def register_user_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
     async def reddit_get_user_posts(
         username: Annotated[str, "Reddit username (without u/ prefix)"],
         sort: Annotated[str, "Sort: new, hot, top, controversial"] = "new",
-        time_filter: Annotated[str, "Time filter for top/controversial: hour, day, week, month, year, all"] = "all",
+        time_filter: Annotated[str, "Time filter for 'top' or 'controversial' sort only: hour, day, week, month, year, all. Ignored for other sort orders."] = "all",
         limit: Annotated[int, "Max posts (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
         Get posts submitted by a specific Reddit user.
 
         Use this to see a Reddit user's submission history.
+
+        Returns: List of post dicts, each with keys: id, title, body, subreddit, author,
+        score, num_comments, created_utc, url, permalink, upvote_ratio, is_self, post_type.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         username = validate_username(username)
         sort = validate_sort(sort, USER_SORT_OPTIONS, "user sort")
@@ -62,13 +70,17 @@ def register_user_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[RedditC
     async def reddit_get_user_comments(
         username: Annotated[str, "Reddit username (without u/ prefix)"],
         sort: Annotated[str, "Sort: new, hot, top, controversial"] = "new",
-        time_filter: Annotated[str, "Time filter for top/controversial: hour, day, week, month, year, all"] = "all",
+        time_filter: Annotated[str, "Time filter for 'top' or 'controversial' sort only: hour, day, week, month, year, all. Ignored for other sort orders."] = "all",
         limit: Annotated[int, "Max comments (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
         Get comments made by a specific Reddit user.
 
         Use this to see a Reddit user's comment history.
+
+        Returns: List of comment dicts, each with keys: id, post_id, author, body, score,
+        created_utc, is_op, parent_id, is_root, permalink, edited, distinguished.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         username = validate_username(username)
         sort = validate_sort(sort, USER_SORT_OPTIONS, "user sort")

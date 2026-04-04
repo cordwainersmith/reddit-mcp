@@ -23,15 +23,19 @@ def register_search_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
     @handle_tool_errors
     async def reddit_search_posts(
         query: Annotated[str, "Search query string (keywords)"],
-        subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'. Use 'all' for site-wide."] = "all",
+        subreddits: Annotated[str, "Comma-separated subreddit names, e.g. 'devops,sre,kubernetes'. Use 'all' for site-wide search (not supported by other tools)."] = "all",
         sort: Annotated[str, "Sort order: relevance, hot, top, new, comments"] = "relevance",
-        time_filter: Annotated[str, "Time filter: hour, day, week, month, year, all"] = "week",
+        time_filter: Annotated[str, "Time filter: hour, day, week, month, year, all. Only affects 'top' and 'comments' sort orders; ignored for others."] = "week",
         limit: Annotated[int, "Max results (1-100)"] = 25,
     ) -> list[dict] | dict:
         """
         Search Reddit posts by keywords across one or more subreddits.
 
         Use this to find Reddit discussions about specific topics, products, or technologies.
+
+        Returns: List of post dicts, each with keys: id, title, body, subreddit, author,
+        score, num_comments, created_utc, url, permalink, upvote_ratio, is_self, post_type.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         sort = validate_sort(sort, SEARCH_SORT_OPTIONS, "search sort")
         time_filter = validate_time_filter(time_filter)
@@ -47,14 +51,18 @@ def register_search_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Reddi
 
     @mcp.tool()
     @handle_tool_errors
-    async def reddit_find_subreddits(
+    async def reddit_search_subreddits(
         query: Annotated[str, "Search terms to find subreddits"],
         limit: Annotated[int, "Max results (1-50)"] = 10,
     ) -> list[dict] | dict:
         """
-        Find Reddit subreddits by topic or keyword.
+        Search for Reddit subreddits by topic or keyword.
 
         Use this to discover which Reddit communities discuss a given subject.
+
+        Returns: List of subreddit info dicts, each with keys: name, title, description,
+        subscribers, active_users, created_utc, over_18, url.
+        On error: {"error": "...", "error_type": "INVALID_INPUT|RATE_LIMITED|API_ERROR"}
         """
         limit = validate_limit(limit, max_val=50)
 

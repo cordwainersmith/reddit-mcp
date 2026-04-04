@@ -1,6 +1,6 @@
 """Tests for MCP tool functions."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -47,7 +47,7 @@ class TestSearchTools:
             query="test", sort="invalid_sort"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_search_reddit_invalid_limit(self, search_funcs):
@@ -55,7 +55,7 @@ class TestSearchTools:
             query="test", limit=200
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_search_reddit_success(self):
@@ -87,7 +87,7 @@ class TestSearchTools:
 
         funcs = register_and_capture(register_search_tools, async_get_client)
         result = await funcs["reddit_search_posts"](query="test")
-        assert result["error_type"] == "SubredditNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_search_reddit_api_error(self):
@@ -103,7 +103,7 @@ class TestSearchTools:
 
         funcs = register_and_capture(register_search_tools, async_get_client)
         result = await funcs["reddit_search_posts"](query="test")
-        assert result["error_type"] == "RedditAPIError"
+        assert result["error_type"] == "API_ERROR"
 
     @pytest.mark.asyncio
     async def test_search_subreddits_success(self):
@@ -118,7 +118,7 @@ class TestSearchTools:
             return mock_client
 
         funcs = register_and_capture(register_search_tools, async_get_client)
-        result = await funcs["reddit_find_subreddits"](query="python")
+        result = await funcs["reddit_search_subreddits"](query="python")
         assert isinstance(result, list)
         assert result[0]["name"] == "python"
 
@@ -187,14 +187,14 @@ class TestPostTools:
 
         funcs = register_and_capture(register_post_tools, async_get_client)
         result = await funcs["reddit_get_post_details"](post_id="nonexistent")
-        assert result["error_type"] == "PostNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_get_subreddit_posts_invalid_sort(self, post_funcs):
         result = await post_funcs["reddit_get_subreddit_posts"](
             subreddits="python", sort="invalid"
         )
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_get_subreddit_posts_success(self):
@@ -212,22 +212,6 @@ class TestPostTools:
         result = await funcs["reddit_get_subreddit_posts"](subreddits="python")
         assert isinstance(result, list)
         assert result[0]["id"] == "1"
-
-    @pytest.mark.asyncio
-    async def test_get_trending_success(self):
-        from reddit_mcp.tools.posts import register_post_tools
-
-        mock_client = AsyncMock()
-        mock_client.get_posts = AsyncMock(
-            return_value=[{"id": "1", "title": "Trending"}]
-        )
-
-        async def async_get_client():
-            return mock_client
-
-        funcs = register_and_capture(register_post_tools, async_get_client)
-        result = await funcs["reddit_get_trending_posts"]()
-        assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_get_posts_batch_success(self):
@@ -280,7 +264,7 @@ class TestCommentTools:
 
         funcs = register_and_capture(register_comment_tools, async_get_client)
         result = await funcs["reddit_get_comment_with_replies"](comment_id="bad")
-        assert result["error_type"] == "CommentNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_get_comment_thread_invalid_context(self):
@@ -288,7 +272,7 @@ class TestCommentTools:
 
         funcs = register_and_capture(register_comment_tools)
         result = await funcs["reddit_get_comment_with_replies"](comment_id="c1", context=0)
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_get_comment_thread_invalid_reply_depth(self):
@@ -296,7 +280,7 @@ class TestCommentTools:
 
         funcs = register_and_capture(register_comment_tools)
         result = await funcs["reddit_get_comment_with_replies"](comment_id="c1", reply_depth=0)
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
 
 class TestUserTools:
@@ -309,7 +293,7 @@ class TestUserTools:
     async def test_get_user_info_invalid_username(self, user_funcs):
         result = await user_funcs["reddit_get_user_info"](username="user@invalid!")
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_get_user_info_success(self):
@@ -341,7 +325,7 @@ class TestUserTools:
 
         funcs = register_and_capture(register_user_tools, async_get_client)
         result = await funcs["reddit_get_user_info"](username="testuser")
-        assert result["error_type"] == "UserNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_get_user_posts_success(self):
@@ -364,7 +348,7 @@ class TestUserTools:
         result = await user_funcs["reddit_get_user_posts"](
             username="testuser", sort="invalid"
         )
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_get_user_comments_success(self):
@@ -387,7 +371,7 @@ class TestUserTools:
         result = await user_funcs["reddit_get_user_comments"](
             username="testuser", sort="invalid"
         )
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
 
 class TestSubredditTools:
@@ -400,7 +384,7 @@ class TestSubredditTools:
     async def test_get_subreddit_info_invalid_name(self, sub_funcs):
         result = await sub_funcs["reddit_get_subreddit_info"](subreddit="invalid subreddit!")
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_get_subreddit_info_client_error(self):
@@ -417,7 +401,7 @@ class TestSubredditTools:
         funcs = register_and_capture(register_subreddit_tools, async_get_client)
         result = await funcs["reddit_get_subreddit_info"](subreddit="testsubreddit")
         assert "error" in result
-        assert result["error_type"] == "SubredditNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_get_subreddit_info_success(self):
@@ -465,14 +449,14 @@ class TestSubredditTools:
 
         funcs = register_and_capture(register_subreddit_tools, async_get_client)
         result = await funcs["reddit_get_subreddit_wiki"](subreddit="python")
-        assert result["error_type"] == "WikiPageNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"
 
     @pytest.mark.asyncio
     async def test_get_subreddit_wiki_invalid_page(self, sub_funcs):
         result = await sub_funcs["reddit_get_subreddit_wiki"](
             subreddit="python", page="page with spaces!"
         )
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_list_wiki_pages_success(self):
@@ -505,4 +489,4 @@ class TestSubredditTools:
 
         funcs = register_and_capture(register_subreddit_tools, async_get_client)
         result = await funcs["reddit_list_subreddit_wiki_pages"](subreddit="python")
-        assert result["error_type"] == "WikiPageNotFoundError"
+        assert result["error_type"] == "NOT_FOUND"

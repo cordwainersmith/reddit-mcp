@@ -55,6 +55,21 @@ class SubmissionError(RedditMCPError):
     """Raised when post creation or submission fails."""
 
 
+_ERROR_CODES: dict[type, str] = {
+    ValidationError: "INVALID_INPUT",
+    SubredditNotFoundError: "NOT_FOUND",
+    PostNotFoundError: "NOT_FOUND",
+    CommentNotFoundError: "NOT_FOUND",
+    WikiPageNotFoundError: "NOT_FOUND",
+    UserNotFoundError: "NOT_FOUND",
+    RateLimitExhaustedError: "RATE_LIMITED",
+    AuthenticationRequiredError: "AUTH_REQUIRED",
+    CredentialError: "CREDENTIAL_ERROR",
+    RedditAPIError: "API_ERROR",
+    SubmissionError: "SUBMISSION_ERROR",
+}
+
+
 def handle_tool_errors(func: Callable) -> Callable:
     """Decorator that catches RedditMCPError and returns an error dict.
 
@@ -67,9 +82,10 @@ def handle_tool_errors(func: Callable) -> Callable:
         try:
             return await func(*args, **kwargs)
         except RedditMCPError as e:
-            return {"error": str(e), "error_type": type(e).__name__}
+            error_code = _ERROR_CODES.get(type(e), "ERROR")
+            return {"error": str(e), "error_type": error_code}
         except Exception as e:
             logger.exception("Unexpected error in tool %s", func.__name__)
-            return {"error": f"Internal error: {e}", "error_type": type(e).__name__}
+            return {"error": f"Internal error: {e}", "error_type": "INTERNAL_ERROR"}
 
     return wrapper

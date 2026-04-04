@@ -16,7 +16,7 @@ def register_comment_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Redd
     @mcp.tool()
     @handle_tool_errors
     async def reddit_get_comment_with_replies(
-        comment_id: Annotated[str, "The comment ID to focus on"],
+        comment_id: Annotated[str, "Comment ID (e.g. 'xyz789', without t1_ prefix)"],
         context: Annotated[int, "How many parent comments to include (1-10)"] = 5,
         reply_depth: Annotated[int, "How many levels of replies to include (1-5)"] = 2,
         reply_limit: Annotated[int, "Max replies per level (1-25)"] = 10,
@@ -26,6 +26,9 @@ def register_comment_tools(mcp: FastMCP, get_client: Callable[[], Awaitable[Redd
 
         Use this to read the full context of a Reddit comment thread, including
         ancestor comments and reply trees.
+
+        Returns: {"target": {id, author, body, score, ...}, "ancestors": [...], "replies": [...]}
+        On error: {"error": "...", "error_type": "INVALID_INPUT|NOT_FOUND|RATE_LIMITED|API_ERROR"}
         """
         context = validate_limit(context, min_val=1, max_val=10)
         reply_depth = validate_limit(reply_depth, min_val=1, max_val=5)

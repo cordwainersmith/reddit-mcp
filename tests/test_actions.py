@@ -42,7 +42,7 @@ class TestVoteTool:
             thing_id="test123", thing_type="post", direction="sideways"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_vote_invalid_thing_type(self, action_funcs):
@@ -50,7 +50,7 @@ class TestVoteTool:
             thing_id="test123", thing_type="subreddit", direction="up"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_vote_success(self):
@@ -88,29 +88,42 @@ class TestVoteTool:
             thing_id="test123", thing_type="post", direction="up"
         )
         assert "error" in result
-        assert result["error_type"] == "AuthenticationRequiredError"
+        assert result["error_type"] == "AUTH_REQUIRED"
 
 
-class TestReplyToPostTool:
+class TestReplyTool:
     @pytest.mark.asyncio
     async def test_reply_to_post_empty_body(self):
         from reddit_mcp.tools.actions import register_action_tools
 
         funcs = register_and_capture(register_action_tools)
-        result = await funcs["reddit_reply_to_post"](post_id="test123", body="")
+        result = await funcs["reddit_reply"](
+            thing_id="test123", thing_type="post", body=""
+        )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
-    async def test_reply_to_post_body_too_long(self):
+    async def test_reply_body_too_long(self):
         from reddit_mcp.tools.actions import register_action_tools
 
         funcs = register_and_capture(register_action_tools)
-        result = await funcs["reddit_reply_to_post"](
-            post_id="test123", body="x" * 40_001
+        result = await funcs["reddit_reply"](
+            thing_id="test123", thing_type="post", body="x" * 40_001
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_reply_invalid_thing_type(self):
+        from reddit_mcp.tools.actions import register_action_tools
+
+        funcs = register_and_capture(register_action_tools)
+        result = await funcs["reddit_reply"](
+            thing_id="test123", thing_type="subreddit", body="Hello"
+        )
+        assert "error" in result
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_reply_to_post_success(self):
@@ -127,42 +140,14 @@ class TestReplyToPostTool:
             return mock_client
 
         funcs = register_and_capture(register_action_tools, async_get_client)
-        result = await funcs["reddit_reply_to_post"](
-            post_id="test123", body="Great post!"
+        result = await funcs["reddit_reply"](
+            thing_id="test123", thing_type="post", body="Great post!"
         )
         assert result["success"] is True
         assert result["id"] == "new_comment"
-
-    @pytest.mark.asyncio
-    async def test_reply_to_post_client_error(self):
-        from reddit_mcp.tools.actions import register_action_tools
-
-        mock_client = AsyncMock()
-        mock_client.reply_to_post = AsyncMock(
-            side_effect=PostNotFoundError("not found")
+        mock_client.reply_to_post.assert_called_once_with(
+            post_id="test123", body="Great post!"
         )
-
-        async def async_get_client():
-            return mock_client
-
-        funcs = register_and_capture(register_action_tools, async_get_client)
-        result = await funcs["reddit_reply_to_post"](
-            post_id="bad", body="Hello"
-        )
-        assert result["error_type"] == "PostNotFoundError"
-
-
-class TestReplyToCommentTool:
-    @pytest.mark.asyncio
-    async def test_reply_to_comment_empty_body(self):
-        from reddit_mcp.tools.actions import register_action_tools
-
-        funcs = register_and_capture(register_action_tools)
-        result = await funcs["reddit_reply_to_comment"](
-            comment_id="c123", body=""
-        )
-        assert "error" in result
-        assert result["error_type"] == "ValidationError"
 
     @pytest.mark.asyncio
     async def test_reply_to_comment_success(self):
@@ -179,11 +164,32 @@ class TestReplyToCommentTool:
             return mock_client
 
         funcs = register_and_capture(register_action_tools, async_get_client)
-        result = await funcs["reddit_reply_to_comment"](
-            comment_id="c123", body="Thanks!"
+        result = await funcs["reddit_reply"](
+            thing_id="c123", thing_type="comment", body="Thanks!"
         )
         assert result["success"] is True
         assert result["id"] == "new_reply"
+        mock_client.reply_to_comment.assert_called_once_with(
+            comment_id="c123", body="Thanks!"
+        )
+
+    @pytest.mark.asyncio
+    async def test_reply_to_post_client_error(self):
+        from reddit_mcp.tools.actions import register_action_tools
+
+        mock_client = AsyncMock()
+        mock_client.reply_to_post = AsyncMock(
+            side_effect=PostNotFoundError("not found")
+        )
+
+        async def async_get_client():
+            return mock_client
+
+        funcs = register_and_capture(register_action_tools, async_get_client)
+        result = await funcs["reddit_reply"](
+            thing_id="bad", thing_type="post", body="Hello"
+        )
+        assert result["error_type"] == "NOT_FOUND"
 
 
 class TestCreatePostTool:
@@ -199,7 +205,7 @@ class TestCreatePostTool:
             body="Body", url="https://example.com"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
         assert "not both" in result["error"]
 
     @pytest.mark.asyncio
@@ -208,7 +214,7 @@ class TestCreatePostTool:
             subreddit="test", title="Title"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_create_post_invalid_subreddit(self, action_funcs):
@@ -216,7 +222,7 @@ class TestCreatePostTool:
             subreddit="invalid subreddit!", title="Title", body="Body"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_create_post_title_too_long(self, action_funcs):
@@ -224,7 +230,7 @@ class TestCreatePostTool:
             subreddit="test", title="A" * 301, body="Body"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_create_post_empty_title(self, action_funcs):
@@ -232,7 +238,7 @@ class TestCreatePostTool:
             subreddit="test", title="", body="Body"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_create_post_invalid_url(self, action_funcs):
@@ -240,7 +246,7 @@ class TestCreatePostTool:
             subreddit="test", title="Title", url="not-a-url"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_create_self_post_success(self):
@@ -300,10 +306,10 @@ class TestCreatePostTool:
         result = await funcs["reddit_create_post"](
             subreddit="test", title="Title", body="Body"
         )
-        assert result["error_type"] == "SubmissionError"
+        assert result["error_type"] == "SUBMISSION_ERROR"
 
 
-class TestSaveTools:
+class TestSaveTool:
     @pytest.mark.asyncio
     async def test_save_invalid_thing_type(self):
         from reddit_mcp.tools.actions import register_action_tools
@@ -313,7 +319,7 @@ class TestSaveTools:
             thing_id="test123", thing_type="subreddit"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_save_success(self):
@@ -351,8 +357,8 @@ class TestSaveTools:
             return mock_client
 
         funcs = register_and_capture(register_action_tools, async_get_client)
-        result = await funcs["reddit_unsave"](
-            thing_id="test123", thing_type="comment"
+        result = await funcs["reddit_save"](
+            thing_id="test123", thing_type="comment", unsave=True
         )
         assert result["success"] is True
         mock_client.save_thing.assert_called_once_with(
@@ -370,7 +376,7 @@ class TestDeleteTool:
             thing_id="test123", thing_type="wiki"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_delete_success(self):
@@ -407,7 +413,7 @@ class TestDeleteTool:
         result = await funcs["reddit_delete"](
             thing_id="test123", thing_type="comment"
         )
-        assert result["error_type"] == "AuthenticationRequiredError"
+        assert result["error_type"] == "AUTH_REQUIRED"
 
 
 class TestEditTool:
@@ -420,7 +426,7 @@ class TestEditTool:
             thing_id="test123", thing_type="comment", body=""
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_edit_invalid_thing_type(self):
@@ -431,7 +437,7 @@ class TestEditTool:
             thing_id="test123", thing_type="message", body="Updated"
         )
         assert "error" in result
-        assert result["error_type"] == "ValidationError"
+        assert result["error_type"] == "INVALID_INPUT"
 
     @pytest.mark.asyncio
     async def test_edit_success(self):
@@ -469,7 +475,7 @@ class TestEditTool:
         result = await funcs["reddit_edit"](
             thing_id="test123", thing_type="comment", body="Updated"
         )
-        assert result["error_type"] == "RedditAPIError"
+        assert result["error_type"] == "API_ERROR"
 
 
 class TestToolRegistration:
@@ -481,11 +487,9 @@ class TestToolRegistration:
         funcs = register_and_capture(register_action_tools)
         expected_tools = {
             "reddit_vote",
-            "reddit_reply_to_post",
-            "reddit_reply_to_comment",
+            "reddit_reply",
             "reddit_create_post",
             "reddit_save",
-            "reddit_unsave",
             "reddit_delete",
             "reddit_edit",
         }
