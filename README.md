@@ -14,25 +14,24 @@ MCP server exposing Reddit search and browsing as tools. Uses AsyncPRAW with mul
 
 ```bash
 uv sync
+cp .env.example .env
 ```
 
-Set the environment variable with your Reddit API credentials:
+Edit `.env` with your Reddit API credentials:
 
-```bash
-export REDDIT_CREDENTIALS="client_id1:secret1,client_id2:secret2"
-```
+```env
+# Single credential
+REDDIT_CREDENTIALS=your_client_id:your_client_secret
 
-Optionally set a custom user agent:
+# Or multiple credentials for rate limit rotation
+REDDIT_CREDENTIALS=client_id1:secret1,client_id2:secret2,client_id3:secret3
 
-```bash
-export REDDIT_USER_AGENT="my-app/1.0"
-```
+# User agent string
+REDDIT_USER_AGENT=reddit-mcp/1.0 (by /u/your_username)
 
-For write operations (vote, reply, post, save, delete, edit), also set:
-
-```bash
-export REDDIT_USERNAME="your_reddit_username"
-export REDDIT_PASSWORD="your_reddit_password"
+# For write operations (vote, reply, post, save, delete, edit)
+REDDIT_USERNAME=your_reddit_username
+REDDIT_PASSWORD=your_reddit_password
 ```
 
 ## Run
